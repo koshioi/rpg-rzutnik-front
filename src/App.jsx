@@ -7,7 +7,7 @@ const SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://localhost:3001";
 // --- Helpers ---------------------------------------------------------------
 const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
 const d10 = () => Math.floor(Math.random() * 10) + 1; // 1..10
-const timeStr = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const timeStr = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 // --- Number Picker with quick buttons -------------------------------------
 function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], disabled = false }) {
@@ -473,15 +473,22 @@ export default function App() {
             </div>
 
             {/* Scrollable results frame */}
-            <div ref={logRef} className="rounded-xl border bg-white/80 p-2 overflow-y-auto" style={{height: 'calc(100dvh - 320px)'}}>
-              <div className="space-y-2">
+            <div ref={logRef} className="rounded-xl border bg-white/80 overflow-y-auto" style={{height: 'calc(100dvh - 320px)'}}>
+              <div className="flex flex-col gap-0 snap-y snap-mandatory h-full">
                 {log.length === 0 ? (
-                  <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
+                  <div className="snap-start min-h-full flex items-center justify-center text-xs text-gray-500 p-4">
+                    Brak rzutów. Wykonaj pierwszy rzut!
+                  </div>
                 ) : (
-                  log.map((item, i) => <LogCard key={i + item.timestamp} item={item} />)
+                  log.map((item, i) => (
+                    <div key={i + item.timestamp} className="snap-start min-h-full flex p-2">
+                      <LogCard item={item} />
+                    </div>
+                  ))
                 )}
               </div>
             </div>
+          </div>
           </div>
         </div>
 
