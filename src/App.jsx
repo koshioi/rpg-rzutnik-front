@@ -50,11 +50,6 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
 function GridCanvas() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
-  const [color, setColor] = useState("#111111");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [tool, setTool] = useState("pen"); // 'pen' | 'brush' | 'eraser'
-  const [size, setSize] = useState(3); // 1..16
-  const lastPt = useRef(null);
 
   const resizeCanvas = () => {
     const canvas = canvasRef.current;
@@ -95,88 +90,12 @@ function GridCanvas() {
     return () => { window.removeEventListener("resize", resizeCanvas); obs.disconnect(); };
   }, []);
 
-  const getXY = (e) => {
-    const rect = stageRef.current.getBoundingClientRect();
-    const src = e.touches?.[0] || e.changedTouches?.[0] || e;
-    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
-  };
-
-  const applyTool = (ctx) => {
-    ctx.lineCap = "round";
-    if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = Math.max(2, size * 2);
-    } else if (tool === "brush") {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 0.6;
-      ctx.lineWidth = Math.max(2, size * 2);
-      ctx.strokeStyle = color;
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = Math.max(1, size);
-      ctx.strokeStyle = color;
-    }
-  };
-
-  const onPointerDown = (e) => {
-    e.preventDefault();
-    setIsDrawing(true);
-    lastPt.current = getXY(e);
-  };
-
-  const onPointerMove = (e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const { x, y } = getXY(e);
-    const ctx = canvasRef.current.getContext("2d");
-    applyTool(ctx);
-    ctx.beginPath();
-    ctx.moveTo(lastPt.current.x, lastPt.current.y);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    lastPt.current = { x, y };
-  };
-
-  const onPointerUp = () => {
-    setIsDrawing(false);
-  };
-
-  const clear = () => drawGrid();
-
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="flex flex-wrap items-center gap-3 p-2 border-b bg-white/80">
-        <span className="text-xs text-gray-600">Narzędzia:</span>
-        <div className="inline-flex rounded-xl border overflow-hidden">
-          <button onClick={() => setTool('pen')} className={`px-3 py-1 text-xs ${tool==='pen'?'bg-gray-900 text-white':'hover:bg-gray-100'}`}>Ołówek</button>
-          <button onClick={() => setTool('brush')} className={`px-3 py-1 text-xs ${tool==='brush'?'bg-gray-900 text-white':'hover:bg-gray-100'}`}>Pędzel</button>
-          <button onClick={() => setTool('eraser')} className={`px-3 py-1 text-xs ${tool==='eraser'?'bg-gray-900 text-white':'hover:bg-gray-100'}`}>Gumka</button>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600">Grubość</span>
-          <input type="range" min={1} max={16} value={size} onChange={(e)=>setSize(Number(e.target.value))} />
-          <div className="text-xs w-6 text-center">{size}</div>
-        </div>
-        <span className="text-xs text-gray-600">Kolor:</span>
-        {["#111111", "#ef4444", "#3b82f6", "#22c55e", "#8b5cf6", "#f59e0b"].map((c) => (
-          <button key={c} className={`w-6 h-6 rounded-full border ${color === c ? "ring-2 ring-offset-2" : ""}`} style={{ backgroundColor: c }} onClick={() => setColor(c)} aria-label={`Wybierz kolor ${c}`} />
-        ))}
-        <button onClick={clear} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50">Wyczyść</button>
-      </div>
       <div className="relative flex-1 min-h-0" ref={stageRef}>
-        
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 cursor-crosshair select-none touch-none"
-          onMouseDown={onPointerDown}
-          onMouseMove={onPointerMove}
-          onMouseUp={onPointerUp}
-          onTouchStart={onPointerDown}
-          onTouchMove={onPointerMove}
-          onTouchEnd={onPointerUp}
-          onContextMenu={(e)=>e.preventDefault()}
+          className="absolute inset-0 select-none pointer-events-none"
         />
       </div>
     </div>
@@ -425,6 +344,14 @@ export default function App() {
       hidden,
       damageMode,
     };
+
+    // RZUT UKRYTY: nie wysyłamy na serwer, tylko lokalnie (i ewentualnie między kartami tego samego urządzenia)
+    if (hidden) {
+      const item = computeRoll(payload);
+      setLog((prev) => [item, ...prev]);
+      bcRef.current?.postMessage({ type: "roll:new", item });
+      return;
+    }
 
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("roll:request", payload);
