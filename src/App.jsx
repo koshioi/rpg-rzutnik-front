@@ -46,7 +46,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   );
 }
 
-// --- Canvas with grid + drawing -------------------------------------------
+// --- Canvas with grid + drawing (pen/brush/eraser) ------------------------
 function GridCanvas() {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -90,6 +90,281 @@ function GridCanvas() {
   };
 
   useEffect(() => {
+    resizeCanvas();
+    const obs = new ResizeObserver(resizeCanvas);
+    if (containerRef.current) obs.observe(containerRef.current);
+    window.addEventListener("resize", resizeCanvas);
+    return () => { window.removeEventListener("resize", resizeCanvas); obs.disconnect(); };
+  }, []);
+
+  const getXY = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const applyTool = (ctx) => {
+    ctx.lineCap = "round";
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = Math.max(2, size * 2);
+    } else if (tool === "brush") {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = Math.max(2, size * 2);
+      ctx.strokeStyle = color;
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = Math.max(1, size);
+      ctx.strokeStyle = color;
+    }
+  };
+
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    canvasRef.current.setPointerCapture?.(e.pointerId);
+    setIsDrawing(true);
+    lastPt.current = getXY(e);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const { x, y } = getXY(e);
+    const ctx = canvasRef.current.getContext("2d");
+    applyTool(ctx);
+    ctx.beginPath();
+    ctx.moveTo(lastPt.current.x, lastPt.current.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    lastPt.current = { x, y };
+  };
+
+  const onPointerUp = (e) => {
+    setIsDrawing(false);
+    canvasRef.current.releasePointerCapture?.(e.pointerId);
+  };
+
+  const clear = () => drawGrid();
+
+  return (
+    <div className="h-full w-full flex flex-col" ref={containerRef}>
+      <div className="flex flex-wrap items-center gap-2 p-2 border-b bg-white/80">
+        <span className="text-xs text-gray-600">Narzędzia:</span>
+        <div className="inline-flex rounded-xl border overflow-hidden">
+          <button onClick={() => setTool('pen')} className={`px-3 py-1 text-xs ${tool==='pen'?'bg-gray-900 text-white':'hover:bg-gray-100'}`}>Ołówek</button>
+          <button onClick={() => setTool('brush')} className={`px-3 py-1 text-xs ${tool==='brush'?'bg-gray-900 text-white':'hover:bg-gray-100'}`}>Pędzel</button>
+          <button onClick={() => setTool('eraser')} className={`px-3 py-1 text-xs ${tool==='eraser'?'bg-gray-900 text-white':'hover:bg-gray-100'}`}>Gumka</button>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600">Grubość</span>
+          <input type="range" min={1} max={16} value={size} onChange={(e)=>setSize(Number(e.target.value))} />
+          <div className="text-xs w-6 text-center">{size}</div>
+        </div>
+        <span className="text-xs text-gray-600">Kolor:</span>
+        {["#111111", "#ef4444", "#3b82f6", "#22c55e", "#8b5cf6", "#f59e0b"].map((c) => (
+          <button
+            key={c}
+            className={`w-6 h-6 rounded-full border ${color === c ? "ring-2 ring-offset-2" : ""}`}
+            style={{ backgroundColor: c }}
+            onClick={() => setColor(c)}
+            aria-label={`Wybierz kolor ${c}`}
+          />
+        ))}
+        <button onClick={clear} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50">Wyczyść</button>
+      </div>
+      <canvas
+        ref={canvasRef}
+        className="flex-1 cursor-crosshair select-none touch-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={onPointerUp}
+      />
+    </div>
+  );
+}
+
+// --- Dice logic (client copy — server is authoritative) -------------------
+function rollDiceSet(count) {
+  const arr = [];
+  for (let i = 0; i < count; i++) arr.push(d10());
+  return arr;
+}
+
+function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateOnes, playerName, hidden, damageMode }) {
+  const effDifficulty = damageMode ? 6 : difficulty;
+  const effReroll = damageMode ? true : rerollExplode;
+
+  // 1) initial rolls
+  const base = rollDiceSet(diceCount);
+  const sumBase = base.reduce((a, b) => a + b, 0);
+  const tensBase = base.filter((v) => v === 10).length;
+  const onesBase = base.filter((v) => v === 1).length;
+  const succBase = base.filter((v) => v >= effDifficulty).length;
+
+  // 2) mitigate ones (niwelowanie pecha)
+  const effMitigate = damageMode ? Math.max(100000, mitigateOnes || 0) : (mitigateOnes || 0);
+  const mitigated = Math.min(effMitigate, onesBase);
+  let onesEffective = Math.max(0, onesBase - mitigated);
+
+  // 3) If reroll on: ones first cancel reroll opportunities from 10s, then successes
+  let cancelledRerolls = 0;
+  let rerollsToDo = 0;
+  let rerollResults = [];
+  let succRerolls = 0;
+
+  if (effReroll) {
+    cancelledRerolls = Math.min(tensBase, onesEffective);
+    rerollsToDo = tensBase - cancelledRerolls; // remaining rerolls from base 10s
+    onesEffective -= cancelledRerolls; // leftover ones will cancel successes later
+
+    // exploding rerolls; 1s on rerolls DO NOT cancel anything
+    let queue = rerollsToDo;
+    while (queue > 0) {
+      let next = 0;
+      for (let i = 0; i < queue; i++) {
+        const r = d10();
+        rerollResults.push(r);
+        if (r >= effDifficulty) succRerolls++;
+        if (r === 10) next++;
+      }
+      queue = next; // more explosions
+    }
+  }
+
+  const naturalSuccesses = succBase + succRerolls;
+  const sumAll = sumBase + rerollResults.reduce((a, b) => a + b, 0);
+
+  const successesBeforeOnes = naturalSuccesses + autoSucc;
+  const finalSuccesses = Math.max(0, successesBeforeOnes - onesEffective);
+  let leftoverBadLuck = Math.max(0, onesEffective - successesBeforeOnes);
+  if (damageMode) leftoverBadLuck = 0; // no PECH in damage mode
+
+  let resultType = "PORAŻKA";
+  if (!damageMode && leftoverBadLuck > 0) resultType = "PECH";
+  else if (finalSuccesses > 0) resultType = "SUKCES";
+
+  return {
+    playerName,
+    hidden,
+    timestamp: new Date().toISOString(),
+    diceCount,
+    difficulty: effDifficulty,
+    autoSucc,
+    baseResults: base,
+    rerollResults,
+    sumBase,
+    sumAll,
+    tensBase,
+    onesBase,
+    mitigated,
+    onesEffective,
+    cancelledRerolls,
+    succBase,
+    succRerolls,
+    naturalSuccesses,
+    successesBeforeOnes,
+    finalSuccesses,
+    leftoverBadLuck,
+    resultType,
+    damageMode,
+  };
+}
+
+// --- Log item --------------------------------------------------------------
+function LogCard({ item }) {
+  const when = useMemo(() => new Date(item.timestamp), [item.timestamp]);
+  const isHidden = item.redacted === true;
+  const type = isHidden ? "UKRYTY" : item.resultType;
+
+  const colorMap = {
+    SUKCES: { text: "text-green-800", bg: "bg-green-100", ring: "ring-green-600", border: "border-green-500" },
+    PORAŻKA: { text: "text-gray-900", bg: "bg-gray-100", ring: "ring-gray-600", border: "border-gray-300" },
+    PECH: { text: "text-red-700", bg: "bg-red-100", ring: "ring-red-600", border: "border-red-500" },
+    UKRYTY: { text: "text-gray-900", bg: "bg-gray-100", ring: "ring-gray-600", border: "border-gray-300" },
+  };
+  const c = colorMap[type];
+
+  const label = isHidden
+    ? "RZUT UKRYTY"
+    : item.resultType + (item.resultType === "SUKCES" ? `!(${item.finalSuccesses})` : item.resultType === "PECH" ? `!(${item.leftoverBadLuck})` : "");
+
+  return (
+    <div className={`rounded-xl border p-3 bg-white shadow-sm border-l-4 ${c.border}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="text-base font-semibold text-gray-900">{item.playerName}:</div>
+        <div className={`text-3xl md:text-4xl font-black tracking-tight ${c.text}`}>
+          <span className={`inline-block ${c.bg} ${c.text} ring-1 ${c.ring} rounded-lg px-2 py-1`}>{label}</span>
+        </div>
+        <div className="text-xs text-gray-500 ml-auto">{timeStr(when)}</div>
+      </div>
+
+      {isHidden ? (
+        <div className="text-xs text-gray-600">Szczegóły ukryte — widoczne tylko dla rzucającego.</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <div><span className="font-semibold">Wyniki:</span> {item.baseResults.join(", ")}</div>
+          <div><span className="font-semibold">Przerzuty:</span> {item.rerollResults.length ? item.rerollResults.join(", ") : "—"}</div>
+          <div><span className="font-semibold">Sukcesy naturalne:</span> {item.naturalSuccesses}</div>
+          <div><span className="font-semibold">AutoSukcesy:</span> {item.autoSucc}</div>
+          <div><span className="font-semibold">Jedynek:</span> {item.onesBase} {item.mitigated ? `(–${item.mitigated} niwel.)` : ""} ⇒ {item.onesEffective}</div>
+          <div><span className="font-semibold">Suma kości:</span> {item.sumAll}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Main App --------------------------------------------------------------
+export default function App() {
+  // form state
+  const [playerName, setPlayerName] = useState("");
+  const [diceCount, setDiceCount] = useState(5);
+  const [difficulty, setDifficulty] = useState(6);
+  const [autoSucc, setAutoSucc] = useState(0); // 0..5
+  const [rerollExplode, setRerollExplode] = useState(false);
+  const [mitigateOnes, setMitigateOnes] = useState(0); // 0..5
+  const [hidden, setHidden] = useState(false);
+  const [damageMode, setDamageMode] = useState(false);
+
+  const [connected, setConnected] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const logRef = useRef(null);
+
+  const [log, setLog] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("dice-log");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const socketRef = useRef(null);
+  const bcRef = useRef(null); // BroadcastChannel for same-origin multi-tab sync
+  const seenRef = useRef(new Set()); // de-duplication
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("dice-log", JSON.stringify(log));
+    } catch {}
+    if (autoScroll && logRef.current) {
+      logRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [log, autoScroll]);
+
+  useEffect(() => {
+    if (damageMode) {
+      setDifficulty(6);
+      setRerollExplode(true);
+    }
+  }, [damageMode]);
+
+  // Connect to Socket.IO and BroadcastChannel
+  useEffect(() => {
     const addItem = (item) => {
       const key = `${item.timestamp}|${item.playerName}|${item.sumAll || 0}|${item.naturalSuccesses || 0}`;
       if (seenRef.current.has(key)) return;
@@ -97,45 +372,37 @@ function GridCanvas() {
       setLog((prev) => [item, ...prev]);
     };
 
-    // Socket.IO connection
-    const s = io(SOCKET_URL, { transports: ["websocket","polling"], autoConnect: true, withCredentials: false });
+    const s = io(SOCKET_URL, { transports: ["websocket", "polling"], autoConnect: true, withCredentials: false });
     socketRef.current = s;
-
-    s.on("connect", () => { setConnected(true); });
+    s.on("connect", () => setConnected(true));
     s.on("disconnect", () => setConnected(false));
     s.on("connect_error", () => setConnected(false));
 
     s.on("history", (items) => {
-      // rebuild seen set and log
       const newSeen = new Set();
-      items.forEach((it) => {
-        const k = `${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`;
-        newSeen.add(k);
-      });
+      items.forEach((it) => newSeen.add(`${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`));
       seenRef.current = newSeen;
       setLog(items);
-      // also broadcast to other tabs
-      bcRef.current?.postMessage({ type: 'history', items });
+      bcRef.current?.postMessage({ type: "history", items });
     });
 
     s.on("roll:new", (item) => {
       addItem(item);
-      bcRef.current?.postMessage({ type: 'roll:new', item });
+      bcRef.current?.postMessage({ type: "roll:new", item });
     });
 
-    // BroadcastChannel for same-origin tabs
-    const bc = new BroadcastChannel('dice-roller');
+    const bc = new BroadcastChannel("dice-roller");
     bcRef.current = bc;
     bc.onmessage = (ev) => {
       const { type, item, items } = ev.data || {};
-      if (type === 'roll:new' && item) addItem(item);
-      if (type === 'history' && Array.isArray(items)) {
+      if (type === "roll:new" && item) addItem(item);
+      if (type === "history" && Array.isArray(items)) {
         const newSeen = new Set();
         items.forEach((it) => newSeen.add(`${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`));
         seenRef.current = newSeen;
         setLog(items);
       }
-      if (type === 'session:new') {
+      if (type === "session:new") {
         seenRef.current = new Set();
         setLog([]);
       }
@@ -164,23 +431,21 @@ function GridCanvas() {
       damageMode,
     };
 
-    // Ask server to compute & broadcast authoritative result
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("roll:request", payload);
     } else {
-      // fallback: compute locally and just show (single-user)
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
     }
   };
 
   const onNewSession = () => {
-    const ok = window.confirm('Rozpocząć NOWĄ SESJĘ? Wspólna historia zostanie wyczyszczona dla wszystkich.');
+    const ok = window.confirm("Rozpocząć NOWĄ SESJĘ? Wspólna historia zostanie wyczyszczona dla wszystkich.");
     if (!ok) return;
     if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('session:new');
+      socketRef.current.emit("session:new");
     }
-    bcRef.current?.postMessage({ type: 'session:new' });
+    bcRef.current?.postMessage({ type: "session:new" });
     setLog([]);
   };
 
@@ -193,9 +458,9 @@ function GridCanvas() {
         <div className="p-3 space-y-3 overflow-y-auto">
           <h1 className="text-xl font-bold tracking-tight">Rzutnik RPG</h1>
           <div className="flex items-center gap-2 text-xs">
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${connected ? 'border-green-600 text-green-700' : 'border-red-600 text-red-700'}`}>
-              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-600' : 'bg-red-600'}`}></span>
-              {connected ? 'Połączono z serwerem' : 'Tryb solo – brak połączenia'}
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${connected ? "border-green-600 text-green-700" : "border-red-600 text-red-700"}`}>
+              <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-600" : "bg-red-600"}`}></span>
+              {connected ? "Połączono z serwerem" : "Tryb solo – brak połączenia"}
             </span>
             <span className="text-gray-500">Panel = 1/5 szerokości, wyniki poniżej.</span>
           </div>
@@ -216,11 +481,7 @@ function GridCanvas() {
 
           <div className="flex flex-col gap-2">
             <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={damageMode}
-                onChange={(e) => setDamageMode(e.target.checked)}
-              />
+              <input type="checkbox" checked={damageMode} onChange={(e) => setDamageMode(e.target.checked)} />
               <span>OBRAŻENIA/WYPAROWANIE (PT=6, przerzut zawsze, bez PECHA)</span>
             </label>
             <label className="inline-flex items-center gap-2 text-sm">
