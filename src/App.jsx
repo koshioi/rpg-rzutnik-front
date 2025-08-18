@@ -54,7 +54,6 @@ function GridCanvas() {
   const [isDrawing, setIsDrawing] = useState(false);
   const lastPt = useRef(null);
 
-  // Resize canvas to container, handle DPR
   const resizeCanvas = () => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -76,27 +75,15 @@ function GridCanvas() {
     const ctx = canvas.getContext("2d");
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
-
-    // clear
     ctx.clearRect(0, 0, w, h);
-
-    // background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
-
-    // grid
     const step = 32;
     ctx.beginPath();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "#e5e7eb"; // gray-200
-    for (let x = 0; x <= w; x += step) {
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, h);
-    }
-    for (let y = 0; y <= h; y += step) {
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(w, y + 0.5);
-    }
+    ctx.strokeStyle = "#e5e7eb";
+    for (let x = 0; x <= w; x += step) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); }
+    for (let y = 0; y <= h; y += step) { ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); }
     ctx.stroke();
   };
 
@@ -105,41 +92,41 @@ function GridCanvas() {
     const obs = new ResizeObserver(resizeCanvas);
     if (containerRef.current) obs.observe(containerRef.current);
     window.addEventListener("resize", resizeCanvas);
-    return () => {
-      window.removeEventListener("resize", resizeCanvas);
-      obs.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { window.removeEventListener("resize", resizeCanvas); obs.disconnect(); };
   }, []);
 
-  const handleDown = (e) => {
-    setIsDrawing(true);
+  const getXY = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
-    lastPt.current = { x, y };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const handleMove = (e) => {
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    canvasRef.current.setPointerCapture?.(e.pointerId);
+    setIsDrawing(true);
+    lastPt.current = getXY(e);
+  };
+
+  const onPointerMove = (e) => {
     if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
-    const ctx = canvas.getContext("2d");
+    e.preventDefault();
+    const { x, y } = getXY(e);
+    const ctx = canvasRef.current.getContext("2d");
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.strokeStyle = color;
-
     ctx.beginPath();
     ctx.moveTo(lastPt.current.x, lastPt.current.y);
     ctx.lineTo(x, y);
     ctx.stroke();
-
     lastPt.current = { x, y };
   };
 
-  const handleUp = () => setIsDrawing(false);
+  const onPointerUp = (e) => {
+    setIsDrawing(false);
+    canvasRef.current.releasePointerCapture?.(e.pointerId);
+  };
+
   const clear = () => drawGrid();
 
   return (
@@ -161,14 +148,12 @@ function GridCanvas() {
       </div>
       <canvas
         ref={canvasRef}
-        className="flex-1 cursor-crosshair select-none"
-        onMouseDown={handleDown}
-        onMouseMove={handleMove}
-        onMouseUp={handleUp}
-        onMouseLeave={handleUp}
-        onTouchStart={handleDown}
-        onTouchMove={handleMove}
-        onTouchEnd={handleUp}
+        className="flex-1 cursor-crosshair select-none touch-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={onPointerUp}
       />
     </div>
   );
@@ -194,7 +179,7 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   const succBase = base.filter((v) => v >= effDifficulty).length;
 
   // 2) mitigate ones (niwelowanie pecha)
-  const mitigated = Math.min(mitigateOnes, onesBase);
+  const mitigated = Math.min(damageMode ? 100000 : mitigateOnes, onesBase);
   let onesEffective = Math.max(0, onesBase - mitigated);
 
   // 3) If reroll on: ones first cancel reroll opportunities from 10s, then successes
@@ -266,30 +251,28 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
 // --- Log item --------------------------------------------------------------
 function LogCard({ item }) {
   const when = useMemo(() => new Date(item.timestamp), [item.timestamp]);
+  const isHidden = item.redacted === true;
+  const type = isHidden ? "UKRYTY" : item.resultType;
+
   const colorMap = {
-    SUKCES: "text-green-600",
+    SUKCES: "text-green-700",
     PORAŻKA: "text-gray-900",
     PECH: "text-red-600",
     UKRYTY: "text-gray-900",
   };
-  const isHidden = item.redacted === true;
-  const type = isHidden ? "UKRYTY" : item.resultType;
+
   const label = isHidden
     ? "RZUT UKRYTY"
     : item.resultType + (item.resultType === "SUKCES" ? `!(${item.finalSuccesses})` : item.resultType === "PECH" ? `!(${item.leftoverBadLuck})` : "");
 
+  const accent = type === "SUKCES" ? "border-green-500" : type === "PECH" ? "border-red-500" : "border-gray-300";
+
   return (
-    <div className="rounded-xl border p-3 bg-white shadow-sm">
-      <div className="flex items-baseline gap-2 mb-1">
-        <div className={`font-extrabold text-lg ${colorMap[type]}`}>{label}</div>
+    <div className={`rounded-xl border p-3 bg-white shadow-sm border-l-4 ${accent}`}>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-base font-semibold text-gray-900">{item.playerName}:</div>
+        <div className={`text-2xl sm:text-3xl font-black tracking-tight ${colorMap[type]}`}>{label}</div>
         <div className="text-xs text-gray-500 ml-auto">{timeStr(when)}</div>
-      </div>
-      <div className="text-sm text-gray-800 mb-1">
-        <span className="font-semibold">{item.playerName}</span>
-        {isHidden ? " · (ukryty)" : ` · PT ${item.difficulty} · Kości ${item.diceCount}`}
-        {!isHidden && (item.autoSucc ? ` · AutoSukcesy ${item.autoSucc}` : "")}
-        {!isHidden && (item.cancelledRerolls ? ` · Jedynki anulowały przerzuty ${item.cancelledRerolls}` : "")}
-        {!isHidden && (item.damageMode ? " · Tryb: Obrażenia/Wyparowanie" : "")}
       </div>
 
       {isHidden ? (
@@ -319,6 +302,9 @@ export default function App() {
   const [mitigateOnes, setMitigateOnes] = useState(0); // 0..5
   const [hidden, setHidden] = useState(false);
   const [damageMode, setDamageMode] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const logRef = useRef(null);
 
   const [log, setLog] = useState(() => {
     try {
@@ -335,7 +321,10 @@ export default function App() {
     try {
       sessionStorage.setItem("dice-log", JSON.stringify(log));
     } catch {}
-  }, [log]);
+    if (autoScroll && logRef.current) {
+      logRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [log, autoScroll]);
 
   useEffect(() => {
     if (damageMode) {
@@ -346,12 +335,13 @@ export default function App() {
 
   // Connect to Socket.IO server
   useEffect(() => {
-    const s = io(SOCKET_URL, { transports: ["websocket"], autoConnect: true });
+    const s = io(SOCKET_URL, { transports: ["websocket","polling"], autoConnect: true, withCredentials: false });
     socketRef.current = s;
 
-    s.on("connect", () => {
-      // console.log("connected", s.id);
-    });
+    s.on("connect", () => { setConnected(true); });
+
+    s.on("disconnect", () => setConnected(false));
+    s.on("connect_error", () => setConnected(false));
 
     s.on("history", (items) => {
       // server sends newest first
@@ -378,7 +368,7 @@ export default function App() {
       difficulty: clamp(difficulty, 1, 20),
       autoSucc: clamp(autoSucc, 0, 5),
       rerollExplode,
-      mitigateOnes: clamp(mitigateOnes, 0, 5),
+      mitigateOnes: damageMode ? 100000 : clamp(mitigateOnes, 0, 5),
       playerName: playerName.trim(),
       hidden,
       damageMode,
@@ -406,12 +396,18 @@ export default function App() {
   const clearLog = () => setLog([]);
 
   return (
-    <div className="h-screen w-screen grid grid-cols-5">
+    <div className="h-screen w-screen grid grid-cols-5 bg-gradient-to-br from-slate-50 to-slate-200">
       {/* Left panel: 1/5 width */}
-      <div className="col-span-1 border-r bg-gray-50 flex flex-col min-w-[300px]">
+      <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
         <div className="p-3 space-y-3 overflow-y-auto">
-          <h1 className="text-lg font-bold">Rzutnik RPG</h1>
-          <p className="text-xs text-gray-600">Panel zajmuje ~1/5 strony. Wyniki są współdzielone między użytkownikami.</p>
+          <h1 className="text-xl font-bold tracking-tight">Rzutnik RPG</h1>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${connected ? 'border-green-600 text-green-700' : 'border-red-600 text-red-700'}`}>
+              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-600' : 'bg-red-600'}`}></span>
+              {connected ? 'Połączono z serwerem' : 'Tryb solo – brak połączenia'}
+            </span>
+            <span className="text-gray-500">Panel = 1/5 szerokości, wyniki poniżej.</span>
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Nazwa gracza *</label>
@@ -449,15 +445,16 @@ export default function App() {
               <label className="text-xs font-semibold text-gray-600">Niwelowanie pecha</label>
               <input
                 type="number"
-                className="w-16 rounded-md border px-2 py-1 text-sm"
+                className="w-16 rounded-md border px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 min={0}
                 max={5}
                 value={mitigateOnes}
+                disabled={damageMode}
                 onChange={(e) => setMitigateOnes(clamp(e.target.value, 0, 5))}
               />
               <div className="flex gap-1">
                 {[0,1,2,3,4,5].map((n) => (
-                  <button key={n} onClick={() => setMitigateOnes(n)} className={`px-2 py-1 rounded-full text-xs border ${mitigateOnes===n?"bg-gray-900 text-white":"hover:bg-gray-100"}`}>{n}</button>
+                  <button key={n} disabled={damageMode} onClick={() => setMitigateOnes(n)} className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${mitigateOnes===n?"bg-gray-900 text-white":"hover:bg-gray-100"}`>{n}</button>
                 ))}
               </div>
             </div>
@@ -479,14 +476,23 @@ export default function App() {
           <div className="flex items-center justify-between mt-2">
             <div className="text-xs text-gray-500">Historia sesji (wspólna)</div>
             <div className="flex items-center gap-3">
+              <button className="text-xs underline" onClick={() => { navigator.clipboard?.writeText(window.location.href); }} title="Kopiuj link do tej sesji">Kopiuj link</button>
+              <label className="text-xs inline-flex items-center gap-1">
+                <input type="checkbox" checked={autoScroll} onChange={(e)=>setAutoScroll(e.target.checked)} /> Auto-scroll
+              </label>
+              <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
+              <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
+            </div>
+          </div>
+            <div className="flex items-center gap-3">
               <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
               <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
             </div>
           </div>
 
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-            {log.length === 0 ? (
-              <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
+          <div ref={logRef} className="rounded-xl border bg-white/80 p-2 h-[45vh] overflow-y-auto">
+            <div className="space-y-2">$1</div>
+          </div>
             ) : (
               log.map((item, i) => <LogCard key={i + item.timestamp} item={item} />)
             )}
