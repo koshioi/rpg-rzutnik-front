@@ -46,7 +46,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   );
 }
 
-// --- Canvas with grid + drawing (pen/brush/eraser) ------------------------
+// --- Canvas with grid (bez rysowania) -------------------------------------
 function GridCanvas() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
@@ -247,7 +247,6 @@ export default function App() {
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef(null);
 
-  
   const [log, setLog] = useState(() => {
     try {
       const raw = sessionStorage.getItem("dice-log");
@@ -358,7 +357,7 @@ export default function App() {
     } else {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
-      // sync between tabs even bez serwera
+      // sync między kartami bez serwera
       bcRef.current?.postMessage({ type: "roll:new", item });
     }
   };
@@ -376,8 +375,8 @@ export default function App() {
   const clearLog = () => setLog([]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-200">
-      {/* Main grid (left panel + center canvas). Right image library is FIXED and not in flow. */}
+    <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-200">
+      {/* Main grid (left panel + center canvas) */}
       <div className="h-full grid grid-cols-5">
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
@@ -477,16 +476,13 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: canvas area 4/5, RESERVED SPACE for fixed right panel using padding-right */}
+        {/* Center: canvas area 4/5 */}
         <div className="col-span-4 flex min-h-0 ">
           <div className="flex-1 min-h-0 flex flex-col">
             <GridCanvas />
           </div>
         </div>
       </div>
-
-      {/* FIXED Right: image library (out of normal flow, won't push page height) */}
-      
     </div>
   );
 }
