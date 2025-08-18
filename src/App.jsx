@@ -47,7 +47,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
 }
 
 // --- Canvas with grid + drawing (pen/brush/eraser) ------------------------
-function GridCanvas({ bgUrl }) {
+function GridCanvas() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
   const [color, setColor] = useState("#111111");
@@ -166,7 +166,7 @@ function GridCanvas({ bgUrl }) {
         <button onClick={clear} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50">Wyczyść</button>
       </div>
       <div className="relative flex-1 min-h-0" ref={stageRef}>
-        {bgUrl && <img src={bgUrl} alt="tło" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />}
+        
         <canvas
           ref={canvasRef}
           className="absolute inset-0 cursor-crosshair select-none touch-none"
@@ -328,11 +328,7 @@ export default function App() {
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef(null);
 
-  const [images, setImages] = useState([]);
-  const [activeImage, setActiveImage] = useState(null);
-  const [showBg, setShowBg] = useState(true);
-  const [libraryOpen, setLibraryOpen] = useState(true);
-
+  
   const [log, setLog] = useState(() => {
     try {
       const raw = sessionStorage.getItem("dice-log");
@@ -555,74 +551,15 @@ export default function App() {
         </div>
 
         {/* Center: canvas area 4/5, RESERVED SPACE for fixed right panel using padding-right */}
-        <div className="col-span-4 flex min-h-0 pr-72">
+        <div className="col-span-4 flex min-h-0 ">
           <div className="flex-1 min-h-0 flex flex-col">
-            <GridCanvas bgUrl={showBg ? activeImage?.url : null} />
+            <GridCanvas />
           </div>
         </div>
       </div>
 
       {/* FIXED Right: image library (out of normal flow, won't push page height) */}
-      <aside className="fixed right-0 top-0 w-72 h-screen border-l bg-white/90 backdrop-blur flex flex-col shadow-lg">
-        <div className="p-2 border-b flex items-center justify-between sticky top-0 z-10 bg-white/90">
-          <span className="text-xs font-semibold">Obrazy</span>
-          <button className="text-xs underline" onClick={() => setLibraryOpen((v) => !v)}>
-            {libraryOpen ? 'Zwiń' : 'Rozwiń'}
-          </button>
-        </div>
-
-        {libraryOpen && (
-          <>
-            <div className="p-2 border-b space-y-2">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  const mapped = files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
-                  setImages((prev) => [...mapped, ...prev]);
-                  if (!activeImage && mapped[0]) setActiveImage(mapped[0]);
-                  e.target.value = '';
-                }}
-              />
-              <label className="text-xs inline-flex items-center gap-2">
-                <input type="checkbox" checked={showBg} onChange={(e)=>setShowBg(e.target.checked)} />
-                <span>Pokaż na płótnie</span>
-              </label>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-              {images.length === 0 ? (
-                <div className="text-xs text-gray-500">Brak obrazów.</div>
-              ) : (
-                images.map((img, idx) => (
-                  <div key={idx} className="border rounded-lg overflow-hidden bg-white">
-                    <div className="h-24 bg-gray-100 flex items-center justify-center">
-                      <img src={img.url} alt={img.name} className="w-full h-24 object-cover" />
-                    </div>
-                    <div className="p-2 flex items-center gap-2">
-                      <div className="text-xs flex-1 truncate" title={img.name}>{img.name}</div>
-                      <button className="text-xs px-2 py-0.5 border rounded" onClick={() => { setActiveImage(img); setShowBg(true); }}>Pokaż</button>
-                      <button className="text-xs px-2 py-0.5 border rounded" onClick={() => {
-                        setImages(prev => {
-                          const copy = [...prev];
-                          const [removed] = copy.splice(idx,1);
-                          if (removed) URL.revokeObjectURL(removed.url);
-                          if (removed && activeImage && removed.url === activeImage.url) {
-                            setActiveImage(copy[0] || null);
-                          }
-                          return copy;
-                        });
-                      }}>Usuń</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </aside>
+      
     </div>
   );
 }
