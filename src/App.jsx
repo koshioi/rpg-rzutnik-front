@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
 // --- Config ---------------------------------------------------------------
@@ -9,7 +9,7 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
 const d10 = () => Math.floor(Math.random() * 10) + 1; // 1..10
 const timeStr = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-// --- Number Picker with quick buttons -------------------------------------
+// --- Number Picker ---------------------------------------------------------
 function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], disabled = false }) {
   const q = quick.length ? quick : Array.from({ length: max - min + 1 }, (_, i) => i + min);
   return (
@@ -32,9 +32,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
               type="button"
               onClick={() => setValue(n)}
               disabled={disabled}
-              className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${
-                value === n ? "bg-gray-900 text-white" : "hover:bg-gray-100"
-              }`}
+              className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${value === n ? "bg-gray-900 text-white" : "hover:bg-gray-100"}`}
               aria-label={`${label} ${n}`}
             >
               {n}
@@ -46,7 +44,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   );
 }
 
-// --- Canvas with grid (no drawing) ----------------------------------------
+// --- Canvas with grid only (no drawing) -----------------------------------
 function GridCanvas() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
@@ -92,19 +90,14 @@ function GridCanvas() {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="relative flex-1 min-h-0" ref={stageRef}>
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 select-none pointer-events-none"
-        />
+        <canvas ref={canvasRef} className="absolute inset-0 select-none pointer-events-none" />
       </div>
     </div>
   );
 }
 
-// --- Dice logic (client copy — server is authoritative) -------------------
-function rollDiceSet(count) {
-  return Array.from({ length: count }, d10);
-}
+// --- Dice logic ------------------------------------------------------------
+function rollDiceSet(count) { return Array.from({ length: count }, d10); }
 
 function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateOnes, playerName, hidden, damageMode }) {
   const effDifficulty = damageMode ? 6 : difficulty;
@@ -156,29 +149,12 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   else if (finalSuccesses > 0) resultType = "SUKCES";
 
   return {
-    playerName,
-    hidden,
-    timestamp: new Date().toISOString(),
-    diceCount,
-    difficulty: effDifficulty,
-    autoSucc,
-    baseResults: base,
-    rerollResults,
-    sumBase,
-    sumAll,
-    tensBase,
-    onesBase,
-    mitigated,
-    onesEffective,
-    cancelledRerolls,
-    succBase,
-    succRerolls,
-    naturalSuccesses,
-    successesBeforeOnes,
-    finalSuccesses,
-    leftoverBadLuck,
-    resultType,
-    damageMode,
+    playerName, hidden, timestamp: new Date().toISOString(),
+    diceCount, difficulty: effDifficulty, autoSucc,
+    baseResults: base, rerollResults, sumBase, sumAll,
+    tensBase, onesBase, mitigated, onesEffective, cancelledRerolls,
+    succBase, succRerolls, naturalSuccesses, successesBeforeOnes,
+    finalSuccesses, leftoverBadLuck, resultType, damageMode,
   };
 }
 
@@ -228,6 +204,7 @@ function LogCard({ item }) {
 
 // --- Main App --------------------------------------------------------------
 export default function App() {
+  // form state
   const [playerName, setPlayerName] = useState("");
   const [diceCount, setDiceCount] = useState(5);
   const [difficulty, setDifficulty] = useState(6);
@@ -252,28 +229,48 @@ export default function App() {
   const logRef = useRef(null);
 
   const [log, setLog] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem("dice-log");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    try { const raw = sessionStorage.getItem("dice-log"); return raw ? JSON.parse(raw) : []; } catch { return []; }
   });
+
+  const pages = useMemo(() => {
+    const arr = [];
+    for (let i = 0; i < log.length; i += 3) arr.push(log.slice(i, i + 3));
+    return arr;
+  }, [log]);
+
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageRefs = useRef([]);
+
+  const scrollToPage = useCallback((idx) => {
+    if (!pages.length) return;
+    const n = Math.max(0, Math.min(idx, pages.length - 1));
+    const el = pageRefs.current[n];
+    if (el && logRef.current) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setPageIndex(n);
+  }, [pages.length]);
+
+  useEffect(() => { setPageIndex(0); }, [pages.length]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
+    if (autoScroll) scrollToPage(0);
+  }, [log]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!pages.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); scrollToPage(pageIndex + 1); }
+      if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); scrollToPage(pageIndex - 1); }
+      if (e.key === 'Home') { e.preventDefault(); scrollToPage(0); }
+      if (e.key === 'End') { e.preventDefault(); scrollToPage(pages.length - 1); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pageIndex, pages.length, scrollToPage]);
 
   const socketRef = useRef(null);
   const bcRef = useRef(null);
   const seenRef = useRef(new Set());
-
-  useEffect(() => {
-    try { sessionStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
-    if (autoScroll && logRef.current) {
-      logRef.current.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [log, autoScroll]);
-
-  useEffect(() => {
-    if (damageMode) { setDifficulty(6); setRerollExplode(true); }
-  }, [damageMode]);
 
   useEffect(() => {
     const addItem = (item) => {
@@ -388,35 +385,15 @@ export default function App() {
 
             <div className="flex flex-col gap-3">
               <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={damageMode ? true : rerollExplode}
-                  disabled={damageMode}
-                  onChange={(e) => !damageMode && setRerollExplode(e.target.checked)}
-                />
+                <input type="checkbox" checked={damageMode ? true : rerollExplode} disabled={damageMode} onChange={(e) => !damageMode && setRerollExplode(e.target.checked)} />
                 <span>Przerzut</span>
               </label>
               <div className="flex items-center gap-3">
                 <label className="text-xs font-semibold text-gray-600">Niwelowanie pecha</label>
-                <input
-                  type="number"
-                  className="w-16 rounded-md border px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  min={0}
-                  max={5}
-                  value={mitigateOnes}
-                  disabled={damageMode}
-                  onChange={(e) => setMitigateOnes(clamp(e.target.value, 0, 5))}
-                />
+                <input type="number" className="w-16 rounded-md border px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed" min={0} max={5} value={mitigateOnes} disabled={damageMode} onChange={(e) => setMitigateOnes(clamp(e.target.value, 0, 5))} />
                 <div className="flex gap-1">
                   {[0,1,2,3,4,5].map((n) => (
-                    <button
-                      key={n}
-                      disabled={damageMode}
-                      onClick={() => setMitigateOnes(n)}
-                      className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${mitigateOnes===n?"bg-gray-900 text-white":"hover:bg-gray-100"}`}
-                    >
-                      {n}
-                    </button>
+                    <button key={n} disabled={damageMode} onClick={() => setMitigateOnes(n)} className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${mitigateOnes===n?"bg-gray-900 text-white":"hover:bg-gray-100"}`}>{n}</button>
                   ))}
                 </div>
               </div>
@@ -426,47 +403,44 @@ export default function App() {
               </label>
             </div>
 
-            <button
-              onClick={onRoll}
-              disabled={!playerName.trim()}
-              className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Wykonaj rzut"
-            >
-              RZUT!
-            </button>
+            <button onClick={onRoll} disabled={!playerName.trim()} className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Wykonaj rzut">RZUT!</button>
 
             <div className="flex items-center justify-between mt-2">
               <div className="text-xs text-gray-500">Historia sesji (wspólna)</div>
               <div className="flex items-center gap-3">
                 <button className="text-xs underline" onClick={() => { navigator.clipboard?.writeText(window.location.href); }} title="Kopiuj link do tej sesji">Kopiuj link</button>
-                <label className="text-xs inline-flex items-center gap-1">
-                  <input type="checkbox" checked={autoScroll} onChange={(e)=>setAutoScroll(e.target.checked)} /> Auto-scroll
-                </label>
+                <label className="text-xs inline-flex items-center gap-1"><input type="checkbox" checked={autoScroll} onChange={(e)=>setAutoScroll(e.target.checked)} /> Auto-scroll</label>
                 <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
                 <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
               </div>
             </div>
 
-            {/* Scrollable results frame (1 wpis na ekran, przewijanie po "kartach") */}
+            {/* Pager controls */}
+            <div className="flex items-center justify-between -mb-1">
+              <div className="text-xs text-gray-500">Strona {pages.length ? pageIndex + 1 : 0}/{pages.length}</div>
+              <div className="flex gap-2">
+                <button className="text-xs px-2 py-1 border rounded disabled:opacity-50" onClick={() => scrollToPage(pageIndex - 1)} disabled={pageIndex <= 0}>‹ Poprzednie 3</button>
+                <button className="text-xs px-2 py-1 border rounded disabled:opacity-50" onClick={() => scrollToPage(pageIndex + 1)} disabled={pageIndex >= pages.length - 1}>Następne 3 ›</button>
+              </div>
+            </div>
+
+            {/* Results: 3-at-a-time pages, own scroll */}
             <div className="flex-1 min-h-0">
-              <div ref={logRef} className="rounded-xl border bg-white/80 h-full overflow-y-auto">
-                <div className="flex flex-col gap-0 snap-y snap-mandatory h-full">
-                  {log.length === 0 ? (
-                    <div className="snap-start min-h-full flex items-center justify-center text-xs text-gray-500 p-4">
-                      Brak rzutów. Wykonaj pierwszy rzut!
-                    </div>
-                  ) : (
-                    log.map((item, i) => (
-                      <div key={i + item.timestamp} className="snap-start min-h-full flex p-2">
-                        <LogCard item={item} />
+              <div ref={logRef} className="rounded-xl border bg-white/80 h-full overflow-y-auto snap-y snap-mandatory">
+                {pages.length === 0 ? (
+                  <div className="snap-start min-h-full flex items-center justify-center text-xs text-gray-500 p-4">Brak rzutów. Wykonaj pierwszy rzut!</div>
+                ) : (
+                  pages.map((page, pIdx) => (
+                    <div key={pIdx} ref={(el) => (pageRefs.current[pIdx] = el)} className="snap-start py-2">
+                      <div className="flex flex-col gap-2">
+                        {page.map((item, i) => (<LogCard key={i + item.timestamp} item={item} />))}
                       </div>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
-        </div>
         </div>
 
         {/* Right: canvas area 4/5 */}
