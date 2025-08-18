@@ -9,7 +9,7 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
 const d10 = () => Math.floor(Math.random() * 10) + 1; // 1..10
 const timeStr = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-// --- Number Picker with quick buttons -------------------------------------
+// --- Number Picker ---------------------------------------------------------
 function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], disabled = false }) {
   const q = quick.length ? quick : Array.from({ length: max - min + 1 }, (_, i) => i + min);
   return (
@@ -26,7 +26,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
           onChange={(e) => setValue(clamp(e.target.value, min, max))}
         />
         <div className="flex flex-wrap gap-1">
-          {q.map((n) => (
+          {(q.length ? q : []).map((n) => (
             <button
               key={n}
               type="button"
@@ -46,7 +46,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   );
 }
 
-// --- Canvas with grid + drawing (pen/brush/eraser) ------------------------
+// --- Canvas (grid + drawing) ----------------------------------------------
 function GridCanvas({ bgUrl }) {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
@@ -125,7 +125,6 @@ function GridCanvas({ bgUrl }) {
     setIsDrawing(true);
     lastPt.current = getXY(e);
   };
-
   const onPointerMove = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
@@ -138,11 +137,7 @@ function GridCanvas({ bgUrl }) {
     ctx.stroke();
     lastPt.current = { x, y };
   };
-
-  const onPointerUp = () => {
-    setIsDrawing(false);
-  };
-
+  const onPointerUp = () => setIsDrawing(false);
   const clear = () => drawGrid();
 
   return (
@@ -165,7 +160,7 @@ function GridCanvas({ bgUrl }) {
         ))}
         <button onClick={clear} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50">Wyczyść</button>
       </div>
-      <div className="relative flex-1" ref={stageRef}>
+      <div className="relative flex-1 min-h-0" ref={stageRef}>
         {bgUrl && <img src={bgUrl} alt="tło" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />}
         <canvas
           ref={canvasRef}
@@ -183,30 +178,23 @@ function GridCanvas({ bgUrl }) {
   );
 }
 
-// --- Dice logic (client copy — server is authoritative) -------------------
-function rollDiceSet(count) {
-  const arr = [];
-  for (let i = 0; i < count; i++) arr.push(d10());
-  return arr;
-}
+// --- Dice logic ------------------------------------------------------------
+function rollDiceSet(count) { return Array.from({length: count}, d10); }
 
 function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateOnes, playerName, hidden, damageMode }) {
   const effDifficulty = damageMode ? 6 : difficulty;
   const effReroll = damageMode ? true : rerollExplode;
 
-  // 1) initial rolls
   const base = rollDiceSet(diceCount);
   const sumBase = base.reduce((a, b) => a + b, 0);
   const tensBase = base.filter((v) => v === 10).length;
   const onesBase = base.filter((v) => v === 1).length;
   const succBase = base.filter((v) => v >= effDifficulty).length;
 
-  // 2) mitigate ones (niwelowanie pecha)
   const effMitigate = damageMode ? Math.max(100000, mitigateOnes || 0) : (mitigateOnes || 0);
   const mitigated = Math.min(effMitigate, onesBase);
   let onesEffective = Math.max(0, onesBase - mitigated);
 
-  // 3) If reroll on: ones first cancel reroll opportunities from 10s, then successes
   let cancelledRerolls = 0;
   let rerollsToDo = 0;
   let rerollResults = [];
@@ -214,10 +202,9 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
 
   if (effReroll) {
     cancelledRerolls = Math.min(tensBase, onesEffective);
-    rerollsToDo = tensBase - cancelledRerolls; // remaining rerolls from base 10s
-    onesEffective -= cancelledRerolls; // leftover ones will cancel successes later
+    rerollsToDo = tensBase - cancelledRerolls;
+    onesEffective -= cancelledRerolls;
 
-    // exploding rerolls; 1s on rerolls DO NOT cancel anything
     let queue = rerollsToDo;
     while (queue > 0) {
       let next = 0;
@@ -227,7 +214,7 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
         if (r >= effDifficulty) succRerolls++;
         if (r === 10) next++;
       }
-      queue = next; // more explosions
+      queue = next;
     }
   }
 
@@ -237,36 +224,19 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   const successesBeforeOnes = naturalSuccesses + autoSucc;
   const finalSuccesses = Math.max(0, successesBeforeOnes - onesEffective);
   let leftoverBadLuck = Math.max(0, onesEffective - successesBeforeOnes);
-  if (damageMode) leftoverBadLuck = 0; // no PECH in damage mode
+  if (damageMode) leftoverBadLuck = 0;
 
   let resultType = "PORAŻKA";
   if (!damageMode && leftoverBadLuck > 0) resultType = "PECH";
   else if (finalSuccesses > 0) resultType = "SUKCES";
 
   return {
-    playerName,
-    hidden,
-    timestamp: new Date().toISOString(),
-    diceCount,
-    difficulty: effDifficulty,
-    autoSucc,
-    baseResults: base,
-    rerollResults,
-    sumBase,
-    sumAll,
-    tensBase,
-    onesBase,
-    mitigated,
-    onesEffective,
-    cancelledRerolls,
-    succBase,
-    succRerolls,
-    naturalSuccesses,
-    successesBeforeOnes,
-    finalSuccesses,
-    leftoverBadLuck,
-    resultType,
-    damageMode,
+    playerName, hidden, timestamp: new Date().toISOString(),
+    diceCount, difficulty: effDifficulty, autoSucc,
+    baseResults: base, rerollResults, sumBase, sumAll,
+    tensBase, onesBase, mitigated, onesEffective, cancelledRerolls,
+    succBase, succRerolls, naturalSuccesses, successesBeforeOnes,
+    finalSuccesses, leftoverBadLuck, resultType, damageMode,
   };
 }
 
@@ -320,9 +290,9 @@ export default function App() {
   const [playerName, setPlayerName] = useState("");
   const [diceCount, setDiceCount] = useState(5);
   const [difficulty, setDifficulty] = useState(6);
-  const [autoSucc, setAutoSucc] = useState(0); // 0..5
+  const [autoSucc, setAutoSucc] = useState(0);
   const [rerollExplode, setRerollExplode] = useState(false);
-  const [mitigateOnes, setMitigateOnes] = useState(0); // 0..5
+  const [mitigateOnes, setMitigateOnes] = useState(0);
   const [hidden, setHidden] = useState(false);
   const [damageMode, setDamageMode] = useState(false);
 
@@ -336,35 +306,20 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(true);
 
   const [log, setLog] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem("dice-log");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    try { return JSON.parse(sessionStorage.getItem("dice-log") || "[]"); } catch { return []; }
   });
 
   const socketRef = useRef(null);
-  const bcRef = useRef(null); // BroadcastChannel for same-origin multi-tab sync
-  const seenRef = useRef(new Set()); // de-duplication
+  const bcRef = useRef(null);
+  const seenRef = useRef(new Set());
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem("dice-log", JSON.stringify(log));
-    } catch {}
-    if (autoScroll && logRef.current) {
-      logRef.current.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    try { sessionStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
+    if (autoScroll && logRef.current) logRef.current.scrollTo({ top: 0, behavior: "smooth" });
   }, [log, autoScroll]);
 
-  useEffect(() => {
-    if (damageMode) {
-      setDifficulty(6);
-      setRerollExplode(true);
-    }
-  }, [damageMode]);
+  useEffect(() => { if (damageMode) { setDifficulty(6); setRerollExplode(true); } }, [damageMode]);
 
-  // Connect to Socket.IO and BroadcastChannel
   useEffect(() => {
     const addItem = (item) => {
       const key = `${item.timestamp}|${item.playerName}|${item.sumAll || 0}|${item.naturalSuccesses || 0}`;
@@ -378,7 +333,6 @@ export default function App() {
     s.on("connect", () => setConnected(true));
     s.on("disconnect", () => setConnected(false));
     s.on("connect_error", () => setConnected(false));
-
     s.on("history", (items) => {
       const newSeen = new Set();
       items.forEach((it) => newSeen.add(`${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`));
@@ -386,11 +340,7 @@ export default function App() {
       setLog(items);
       bcRef.current?.postMessage({ type: "history", items });
     });
-
-    s.on("roll:new", (item) => {
-      addItem(item);
-      bcRef.current?.postMessage({ type: "roll:new", item });
-    });
+    s.on("roll:new", (item) => { addItem(item); bcRef.current?.postMessage({ type: "roll:new", item }); });
 
     const bc = new BroadcastChannel("dice-roller");
     bcRef.current = bc;
@@ -400,27 +350,16 @@ export default function App() {
       if (type === "history" && Array.isArray(items)) {
         const newSeen = new Set();
         items.forEach((it) => newSeen.add(`${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`));
-        seenRef.current = newSeen;
-        setLog(items);
+        seenRef.current = newSeen; setLog(items);
       }
-      if (type === "session:new") {
-        seenRef.current = new Set();
-        setLog([]);
-      }
+      if (type === "session:new") { seenRef.current = new Set(); setLog([]); }
     };
 
-    return () => {
-      s.disconnect();
-      bc.close();
-    };
+    return () => { s.disconnect(); bc.close(); };
   }, []);
 
   const onRoll = () => {
-    if (!playerName.trim()) {
-      alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu.");
-      return;
-    }
-
+    if (!playerName.trim()) { alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu."); return; }
     const payload = {
       diceCount: clamp(diceCount, 1, 20),
       difficulty: clamp(difficulty, 1, 20),
@@ -428,16 +367,13 @@ export default function App() {
       rerollExplode,
       mitigateOnes: damageMode ? 100000 : clamp(mitigateOnes, 0, 5),
       playerName: playerName.trim(),
-      hidden,
-      damageMode,
+      hidden, damageMode,
     };
-
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("roll:request", payload);
     } else {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
-      // synchronizacja między kartami bez serwera
       bcRef.current?.postMessage({ type: "roll:new", item });
     }
   };
@@ -445,13 +381,10 @@ export default function App() {
   const onNewSession = () => {
     const ok = window.confirm("Rozpocząć NOWĄ SESJĘ? Wspólna historia zostanie wyczyszczona dla wszystkich.");
     if (!ok) return;
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("session:new");
-    }
+    if (socketRef.current && socketRef.current.connected) socketRef.current.emit("session:new");
     bcRef.current?.postMessage({ type: "session:new" });
     setLog([]);
   };
-
   const clearLog = () => setLog([]);
 
   return (
@@ -459,7 +392,6 @@ export default function App() {
       {/* Left panel: 1/5 width */}
       <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
         <div className="p-4 space-y-4 overflow-y-auto">
-          {/* Nazwa gracza */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Nazwa gracza *</label>
             <input
@@ -541,7 +473,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Scrollable results frame */}
           <div ref={logRef} className="rounded-xl border bg-white/80 p-2 h-[60vh] overflow-y-auto">
             <div className="space-y-2">
               {log.length === 0 ? (
@@ -554,15 +485,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* Right: drawing + image library */}
+      {/* Right: drawing + sticky image library */}
       <div className="col-span-4 flex min-h-0">
-        {/* Left: drawing surface */}
+        {/* left: drawing surface */}
         <div className="flex-1 min-h-0 flex flex-col">
           <GridCanvas bgUrl={showBg ? activeImage?.url : null} />
         </div>
 
-        {/* Right: image library sidebar */}
-        <div className="w-72 border-l bg-white/70 flex flex-col min-h-0">
+        {/* right: sticky sidebar */}
+        <div className="w-72 shrink-0 sticky top-0 self-start h-screen border-l bg-white/80 backdrop-blur flex flex-col overflow-hidden">
           <div className="p-2 border-b flex items-center justify-between">
             <span className="text-xs font-semibold">Obrazy</span>
             <button className="text-xs underline" onClick={() => setLibraryOpen((v) => !v)}>
@@ -603,17 +534,20 @@ export default function App() {
                       <div className="p-2 flex items-center gap-2">
                         <div className="text-xs flex-1 truncate" title={img.name}>{img.name}</div>
                         <button className="text-xs px-2 py-0.5 border rounded" onClick={() => { setActiveImage(img); setShowBg(true); }}>Pokaż</button>
-                        <button className="text-xs px-2 py-0.5 border rounded" onClick={() => {
-                          setImages(prev => {
-                            const copy = [...prev];
-                            const [removed] = copy.splice(idx,1);
-                            if (removed) URL.revokeObjectURL(removed.url);
-                            if (removed && activeImage && removed.url === activeImage.url) {
-                              setActiveImage(copy[0] || null);
-                            }
-                            return copy;
-                          });
-                        }}>Usuń</button>
+                        <button
+                          className="text-xs px-2 py-0.5 border rounded"
+                          onClick={() => {
+                            setImages(prev => {
+                              const copy = [...prev];
+                              const [removed] = copy.splice(idx,1);
+                              if (removed) URL.revokeObjectURL(removed.url);
+                              if (removed && activeImage && removed.url === activeImage.url) {
+                                setActiveImage(copy[0] || null);
+                              }
+                              return copy;
+                            });
+                          }}
+                        >Usuń</button>
                       </div>
                     </div>
                   ))
