@@ -77,6 +77,7 @@ function GridCanvas({ bgUrl }) {
     const ctx = canvas.getContext("2d");
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
+    // transparent background; show image below if any
     ctx.clearRect(0, 0, w, h);
     const step = 32;
     ctx.beginPath();
@@ -97,7 +98,8 @@ function GridCanvas({ bgUrl }) {
 
   const getXY = (e) => {
     const rect = stageRef.current.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const src = e.touches?.[0] || e.changedTouches?.[0] || e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
   };
 
   const applyTool = (ctx) => {
@@ -171,12 +173,18 @@ function GridCanvas({ bgUrl }) {
         <canvas
           ref={canvasRef}
           className="absolute inset-0 cursor-crosshair select-none touch-none"
+          onMouseDown={onPointerDown}
+          onMouseMove={onPointerMove}
+          onMouseUp={onPointerUp}
+          onTouchStart={onPointerDown}
+          onTouchMove={onPointerMove}
+          onTouchEnd={onPointerUp}
+          onContextMenu={(e)=>e.preventDefault()}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onPointerLeave={onPointerUp}
-          onContextMenu={(e)=>e.preventDefault()}
         />
       </div>
     </div>
@@ -335,6 +343,18 @@ export default function App() {
   const [showBg, setShowBg] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(true);
 
+  const removeImage = (idx) => {
+    setImages((prev) => {
+      const copy = [...prev];
+      const [removed] = copy.splice(idx, 1);
+      if (removed) URL.revokeObjectURL(removed.url);
+      if (activeImage && removed && removed.url === activeImage.url) {
+        setActiveImage(copy[0] || null);
+      }
+      return copy;
+    });
+  };
+
   const [log, setLog] = useState(() => {
     try {
       const raw = sessionStorage.getItem("dice-log");
@@ -437,7 +457,6 @@ export default function App() {
     } else {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
-      // synchronizacja między kartami bez serwera
       bcRef.current?.postMessage({ type: "roll:new", item });
     }
   };
@@ -554,13 +573,12 @@ export default function App() {
         </div>
       </div>
 
-      {/* Right: drawing + image library */}
+      {/* Right: canvas area 4/5 */}
       <div className="col-span-4 flex min-h-0">
         {/* Left: drawing surface */}
         <div className="flex-1 min-h-0 flex flex-col">
           <GridCanvas bgUrl={showBg ? activeImage?.url : null} />
         </div>
-
         {/* Right: image library sidebar */}
         <div className="w-72 border-l bg-white/70 flex flex-col min-h-0">
           <div className="p-2 border-b flex items-center justify-between">
@@ -569,7 +587,6 @@ export default function App() {
               {libraryOpen ? 'Zwiń' : 'Rozwiń'}
             </button>
           </div>
-
           {libraryOpen && (
             <>
               <div className="p-2 border-b space-y-2">
@@ -590,7 +607,6 @@ export default function App() {
                   <span>Pokaż na płótnie</span>
                 </label>
               </div>
-
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {images.length === 0 ? (
                   <div className="text-xs text-gray-500">Brak obrazów.</div>
@@ -603,17 +619,7 @@ export default function App() {
                       <div className="p-2 flex items-center gap-2">
                         <div className="text-xs flex-1 truncate" title={img.name}>{img.name}</div>
                         <button className="text-xs px-2 py-0.5 border rounded" onClick={() => { setActiveImage(img); setShowBg(true); }}>Pokaż</button>
-                        <button className="text-xs px-2 py-0.5 border rounded" onClick={() => {
-                          setImages(prev => {
-                            const copy = [...prev];
-                            const [removed] = copy.splice(idx,1);
-                            if (removed) URL.revokeObjectURL(removed.url);
-                            if (removed && activeImage && removed.url === activeImage.url) {
-                              setActiveImage(copy[0] || null);
-                            }
-                            return copy;
-                          });
-                        }}>Usuń</button>
+                        <button className="text-xs px-2 py-0.5 border rounded" onClick={() => removeImage(idx)}>Usuń</button>
                       </div>
                     </div>
                   ))
@@ -621,8 +627,6 @@ export default function App() {
               </div>
             </>
           )}
-        </div>
-      </div>
     </div>
   );
 }
