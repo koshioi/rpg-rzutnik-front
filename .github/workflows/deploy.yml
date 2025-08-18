@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm ci
+      - run: npm install
       - name: Set repo name for base path
         run: echo "REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
       - name: Write env file
