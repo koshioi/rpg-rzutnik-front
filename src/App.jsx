@@ -77,7 +77,6 @@ function GridCanvas({ bgUrl }) {
     const ctx = canvas.getContext("2d");
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
-    // transparent background; show image below if any
     ctx.clearRect(0, 0, w, h);
     const step = 32;
     ctx.beginPath();
@@ -177,6 +176,7 @@ function GridCanvas({ bgUrl }) {
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onPointerLeave={onPointerUp}
+          onContextMenu={(e)=>e.preventDefault()}
         />
       </div>
     </div>
@@ -332,6 +332,8 @@ export default function App() {
 
   const [images, setImages] = useState([]);
   const [activeImage, setActiveImage] = useState(null);
+  const [showBg, setShowBg] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(true);
 
   const [log, setLog] = useState(() => {
     try {
@@ -430,11 +432,14 @@ export default function App() {
       damageMode,
     };
 
-    if (!(socketRef.current && socketRef.current.connected)) {
-      alert("Brak połączenia z serwerem — tryb solo wyłączony. Upewnij się, że backend działa i adres SOCKET_URL jest poprawny.");
-      return;
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("roll:request", payload);
+    } else {
+      const item = computeRoll(payload);
+      setLog((prev) => [item, ...prev]);
+      // synchronizacja między kartami bez serwera
+      bcRef.current?.postMessage({ type: "roll:new", item });
     }
-    socketRef.current.emit("roll:request", payload);
   };
 
   const onNewSession = () => {
@@ -517,7 +522,7 @@ export default function App() {
 
           <button
             onClick={onRoll}
-            disabled={!playerName.trim() || !connected}
+            disabled={!playerName.trim()}
             className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Wykonaj rzut"
           >
@@ -549,32 +554,73 @@ export default function App() {
         </div>
       </div>
 
-      {/* Right: canvas area 4/5 */}
-      <div className="col-span-4 flex flex-col min-h-0">
-        <div className="p-2 border-b bg-white/70 flex flex-wrap items-center gap-2">
-          <label className="text-xs font-semibold">Wgraj obraz:</label>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const mapped = files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
-              setImages((prev) => [...mapped, ...prev]);
-              if (!activeImage && mapped[0]) setActiveImage(mapped[0]);
-              e.target.value = '';
-            }}
-          />
-          <div className="flex gap-1 flex-wrap">
-            {images.map((img, idx) => (
-              <button key={idx} onClick={() => setActiveImage(img)} className={`px-2 py-1 rounded border text-xs ${activeImage?.url===img.url? 'bg-gray-900 text-white':'hover:bg-gray-100'}`} title={img.name}>
-                {img.name}
-              </button>
-            ))}
-          </div>
+      {/* Right: drawing + image library */}
+      <div className="col-span-4 flex min-h-0">
+        {/* Left: drawing surface */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <GridCanvas bgUrl={showBg ? activeImage?.url : null} />
         </div>
-        <div className="flex-1 min-h-0">
-          <GridCanvas bgUrl={activeImage?.url} />
+
+        {/* Right: image library sidebar */}
+        <div className="w-72 border-l bg-white/70 flex flex-col min-h-0">
+          <div className="p-2 border-b flex items-center justify-between">
+            <span className="text-xs font-semibold">Obrazy</span>
+            <button className="text-xs underline" onClick={() => setLibraryOpen((v) => !v)}>
+              {libraryOpen ? 'Zwiń' : 'Rozwiń'}
+            </button>
+          </div>
+
+          {libraryOpen && (
+            <>
+              <div className="p-2 border-b space-y-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    const mapped = files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
+                    setImages((prev) => [...mapped, ...prev]);
+                    if (!activeImage && mapped[0]) setActiveImage(mapped[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <label className="text-xs inline-flex items-center gap-2">
+                  <input type="checkbox" checked={showBg} onChange={(e)=>setShowBg(e.target.checked)} />
+                  <span>Pokaż na płótnie</span>
+                </label>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {images.length === 0 ? (
+                  <div className="text-xs text-gray-500">Brak obrazów.</div>
+                ) : (
+                  images.map((img, idx) => (
+                    <div key={idx} className="border rounded-lg overflow-hidden bg-white">
+                      <div className="h-24 bg-gray-100 flex items-center justify-center">
+                        <img src={img.url} alt={img.name} className="w-full h-24 object-cover" />
+                      </div>
+                      <div className="p-2 flex items-center gap-2">
+                        <div className="text-xs flex-1 truncate" title={img.name}>{img.name}</div>
+                        <button className="text-xs px-2 py-0.5 border rounded" onClick={() => { setActiveImage(img); setShowBg(true); }}>Pokaż</button>
+                        <button className="text-xs px-2 py-0.5 border rounded" onClick={() => {
+                          setImages(prev => {
+                            const copy = [...prev];
+                            const [removed] = copy.splice(idx,1);
+                            if (removed) URL.revokeObjectURL(removed.url);
+                            if (removed && activeImage && removed.url === activeImage.url) {
+                              setActiveImage(copy[0] || null);
+                            }
+                            return copy;
+                          });
+                        }}>Usuń</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
