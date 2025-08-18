@@ -431,12 +431,11 @@ export default function App() {
       damageMode,
     };
 
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("roll:request", payload);
-    } else {
-      const item = computeRoll(payload);
-      setLog((prev) => [item, ...prev]);
+    if (!(socketRef.current && socketRef.current.connected)) {
+      alert("Brak połączenia z serwerem — tryb solo wyłączony. Upewnij się, że backend działa i adres SOCKET_URL jest poprawny.");
+      return;
     }
+    socketRef.current.emit("roll:request", payload);
   };
 
   const onNewSession = () => {
@@ -525,8 +524,8 @@ export default function App() {
 
           <button
             onClick={onRoll}
-            disabled={!playerName.trim()}
-            className="w-full py-2 rounded-xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50"
+            disabled={!playerName.trim() || !connected}
+            className="w-full py-2 rounded-xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Wykonaj rzut"
           >
             RZUT!
