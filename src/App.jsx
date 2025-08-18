@@ -364,7 +364,7 @@ export default function App() {
       <div className="h-full grid grid-cols-5">
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
-          <div className="p-4 space-y-4 overflow-y-auto">
+          <div className="p-4 space-y-4 flex flex-col h-full overflow-hidden">
             {/* Nazwa gracza */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Nazwa gracza *</label>
@@ -448,22 +448,25 @@ export default function App() {
             </div>
 
             {/* Scrollable results frame (1 wpis na ekran, przewijanie po "kartach") */}
-            <div ref={logRef} className="rounded-xl border bg-white/80 overflow-y-auto" style={{height: 'calc(100dvh - 320px)'}}>
-              <div className="flex flex-col gap-0 snap-y snap-mandatory h-full">
-                {log.length === 0 ? (
-                  <div className="snap-start min-h-full flex items-center justify-center text-xs text-gray-500 p-4">
-                    Brak rzutów. Wykonaj pierwszy rzut!
-                  </div>
-                ) : (
-                  log.map((item, i) => (
-                    <div key={i + item.timestamp} className="snap-start min-h-full flex p-2">
-                      <LogCard item={item} />
+            <div className="flex-1 min-h-0">
+              <div ref={logRef} className="rounded-xl border bg-white/80 h-full overflow-y-auto">
+                <div className="flex flex-col gap-0 snap-y snap-mandatory h-full">
+                  {log.length === 0 ? (
+                    <div className="snap-start min-h-full flex items-center justify-center text-xs text-gray-500 p-4">
+                      Brak rzutów. Wykonaj pierwszy rzut!
                     </div>
-                  ))
-                )}
+                  ) : (
+                    log.map((item, i) => (
+                      <div key={i + item.timestamp} className="snap-start min-h-full flex p-2">
+                        <LogCard item={item} />
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Right: canvas area 4/5 */}
