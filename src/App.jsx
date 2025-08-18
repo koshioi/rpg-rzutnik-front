@@ -339,7 +339,6 @@ export default function App() {
     socketRef.current = s;
 
     s.on("connect", () => { setConnected(true); });
-
     s.on("disconnect", () => setConnected(false));
     s.on("connect_error", () => setConnected(false));
 
@@ -454,7 +453,14 @@ export default function App() {
               />
               <div className="flex gap-1">
                 {[0,1,2,3,4,5].map((n) => (
-                  <button key={n} disabled={damageMode} onClick={() => setMitigateOnes(n)} className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${mitigateOnes===n?"bg-gray-900 text-white":"hover:bg-gray-100"}`>{n}</button>
+                  <button
+                    key={n}
+                    disabled={damageMode}
+                    onClick={() => setMitigateOnes(n)}
+                    className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 disabled:cursor-not-allowed ${mitigateOnes===n?"bg-gray-900 text-white":"hover:bg-gray-100"}`}
+                  >
+                    {n}
+                  </button>
                 ))}
               </div>
             </div>
@@ -484,18 +490,15 @@ export default function App() {
               <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
             </div>
           </div>
-            <div className="flex items-center gap-3">
-              <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
-              <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
-            </div>
-          </div>
 
           <div ref={logRef} className="rounded-xl border bg-white/80 p-2 h-[45vh] overflow-y-auto">
-            <div className="space-y-2">$1</div>
-          </div>
-            ) : (
-              log.map((item, i) => <LogCard key={i + item.timestamp} item={item} />)
-            )}
+            <div className="space-y-2">
+              {log.length === 0 ? (
+                <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
+              ) : (
+                log.map((item, i) => <LogCard key={i + item.timestamp} item={item} />)
+              )}
+            </div>
           </div>
         </div>
       </div>
