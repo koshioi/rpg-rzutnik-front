@@ -46,7 +46,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   );
 }
 
-// --- Canvas with grid (bez rysowania) -------------------------------------
+// --- Canvas with grid + drawing (pen/brush/eraser) ------------------------
 function GridCanvas() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
@@ -84,10 +84,9 @@ function GridCanvas() {
 
   useEffect(() => {
     resizeCanvas();
-    const obs = new ResizeObserver(resizeCanvas);
-    if (stageRef.current) obs.observe(stageRef.current);
-    window.addEventListener("resize", resizeCanvas);
-    return () => { window.removeEventListener("resize", resizeCanvas); obs.disconnect(); };
+    const onResize = () => resizeCanvas();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   return (
@@ -244,9 +243,19 @@ export default function App() {
   const [damageMode, setDamageMode] = useState(false);
 
   const [connected, setConnected] = useState(false);
+
+  // enforce no-page-scroll and full-height root
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.id = 'no-scroll-style';
+    style.innerHTML = 'html,body,#root{height:100%;overflow:hidden;margin:0;padding:0}';
+    document.head.appendChild(style);
+    return () => { document.getElementById('no-scroll-style')?.remove(); };
+  }, []);
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef(null);
 
+  
   const [log, setLog] = useState(() => {
     try {
       const raw = sessionStorage.getItem("dice-log");
@@ -357,7 +366,7 @@ export default function App() {
     } else {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
-      // sync między kartami bez serwera
+      // sync between tabs even bez serwera
       bcRef.current?.postMessage({ type: "roll:new", item });
     }
   };
@@ -376,7 +385,7 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-200">
-      {/* Main grid (left panel + center canvas) */}
+      {/* Main grid (left panel + center canvas). Right image library is FIXED and not in flow. */}
       <div className="h-full grid grid-cols-5">
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
@@ -464,7 +473,7 @@ export default function App() {
             </div>
 
             {/* Scrollable results frame */}
-            <div ref={logRef} className="rounded-xl border bg-white/80 p-2 h-[60vh] overflow-y-auto">
+            <div ref={logRef} className="rounded-xl border bg-white/80 p-2 overflow-y-auto" style={{height: 'calc(100dvh - 320px)'}}>
               <div className="space-y-2">
                 {log.length === 0 ? (
                   <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
@@ -476,13 +485,16 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: canvas area 4/5 */}
+        {/* Center: canvas area 4/5, RESERVED SPACE for fixed right panel using padding-right */}
         <div className="col-span-4 flex min-h-0 ">
           <div className="flex-1 min-h-0 flex flex-col">
             <GridCanvas />
           </div>
         </div>
       </div>
+
+      {/* FIXED Right: image library (out of normal flow, won't push page height) */}
+      
     </div>
   );
 }
