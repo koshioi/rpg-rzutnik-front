@@ -46,7 +46,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   );
 }
 
-// --- Canvas with grid + drawing (pen/brush/eraser) ------------------------
+// --- Canvas with grid (no drawing) ----------------------------------------
 function GridCanvas() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
@@ -110,19 +110,16 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   const effDifficulty = damageMode ? 6 : difficulty;
   const effReroll = damageMode ? true : rerollExplode;
 
-  // 1) initial rolls
   const base = rollDiceSet(diceCount);
   const sumBase = base.reduce((a, b) => a + b, 0);
   const tensBase = base.filter((v) => v === 10).length;
   const onesBase = base.filter((v) => v === 1).length;
   const succBase = base.filter((v) => v >= effDifficulty).length;
 
-  // 2) mitigate ones (niwelowanie pecha)
   const effMitigate = damageMode ? Math.max(100000, mitigateOnes || 0) : (mitigateOnes || 0);
   const mitigated = Math.min(effMitigate, onesBase);
   let onesEffective = Math.max(0, onesBase - mitigated);
 
-  // 3) If reroll on: ones first cancel reroll opportunities from 10s, then successes
   let cancelledRerolls = 0;
   let rerollsToDo = 0;
   let rerollResults = [];
@@ -130,10 +127,9 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
 
   if (effReroll) {
     cancelledRerolls = Math.min(tensBase, onesEffective);
-    rerollsToDo = tensBase - cancelledRerolls; // remaining rerolls from base 10s
-    onesEffective -= cancelledRerolls; // leftover ones will cancel successes later
+    rerollsToDo = tensBase - cancelledRerolls;
+    onesEffective -= cancelledRerolls;
 
-    // exploding rerolls; 1s on rerolls DO NOT cancel anything
     let queue = rerollsToDo;
     while (queue > 0) {
       let next = 0;
@@ -143,7 +139,7 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
         if (r >= effDifficulty) succRerolls++;
         if (r === 10) next++;
       }
-      queue = next; // more explosions
+      queue = next;
     }
   }
 
@@ -153,7 +149,7 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   const successesBeforeOnes = naturalSuccesses + autoSucc;
   const finalSuccesses = Math.max(0, successesBeforeOnes - onesEffective);
   let leftoverBadLuck = Math.max(0, onesEffective - successesBeforeOnes);
-  if (damageMode) leftoverBadLuck = 0; // no PECH in damage mode
+  if (damageMode) leftoverBadLuck = 0;
 
   let resultType = "PORAŻKA";
   if (!damageMode && leftoverBadLuck > 0) resultType = "PECH";
@@ -232,13 +228,12 @@ function LogCard({ item }) {
 
 // --- Main App --------------------------------------------------------------
 export default function App() {
-  // form state
   const [playerName, setPlayerName] = useState("");
   const [diceCount, setDiceCount] = useState(5);
   const [difficulty, setDifficulty] = useState(6);
-  const [autoSucc, setAutoSucc] = useState(0); // 0..5
+  const [autoSucc, setAutoSucc] = useState(0);
   const [rerollExplode, setRerollExplode] = useState(false);
-  const [mitigateOnes, setMitigateOnes] = useState(0); // 0..5
+  const [mitigateOnes, setMitigateOnes] = useState(0);
   const [hidden, setHidden] = useState(false);
   const [damageMode, setDamageMode] = useState(false);
 
@@ -252,10 +247,10 @@ export default function App() {
     document.head.appendChild(style);
     return () => { document.getElementById('no-scroll-style')?.remove(); };
   }, []);
+
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef(null);
 
-  
   const [log, setLog] = useState(() => {
     try {
       const raw = sessionStorage.getItem("dice-log");
@@ -266,26 +261,20 @@ export default function App() {
   });
 
   const socketRef = useRef(null);
-  const bcRef = useRef(null); // BroadcastChannel for same-origin multi-tab sync
-  const seenRef = useRef(new Set()); // de-duplication
+  const bcRef = useRef(null);
+  const seenRef = useRef(new Set());
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem("dice-log", JSON.stringify(log));
-    } catch {}
+    try { sessionStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
     if (autoScroll && logRef.current) {
       logRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [log, autoScroll]);
 
   useEffect(() => {
-    if (damageMode) {
-      setDifficulty(6);
-      setRerollExplode(true);
-    }
+    if (damageMode) { setDifficulty(6); setRerollExplode(true); }
   }, [damageMode]);
 
-  // Connect to Socket.IO and BroadcastChannel
   useEffect(() => {
     const addItem = (item) => {
       const key = `${item.timestamp}|${item.playerName}|${item.sumAll || 0}|${item.naturalSuccesses || 0}`;
@@ -324,23 +313,14 @@ export default function App() {
         seenRef.current = newSeen;
         setLog(items);
       }
-      if (type === "session:new") {
-        seenRef.current = new Set();
-        setLog([]);
-      }
+      if (type === "session:new") { seenRef.current = new Set(); setLog([]); }
     };
 
-    return () => {
-      s.disconnect();
-      bc.close();
-    };
+    return () => { s.disconnect(); bc.close(); };
   }, []);
 
   const onRoll = () => {
-    if (!playerName.trim()) {
-      alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu.");
-      return;
-    }
+    if (!playerName.trim()) { alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu."); return; }
 
     const payload = {
       diceCount: clamp(diceCount, 1, 20),
@@ -353,7 +333,6 @@ export default function App() {
       damageMode,
     };
 
-    // RZUT UKRYTY: nie wysyłamy na serwer, tylko lokalnie (i ewentualnie między kartami tego samego urządzenia)
     if (hidden) {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
@@ -366,7 +345,6 @@ export default function App() {
     } else {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
-      // sync between tabs even bez serwera
       bcRef.current?.postMessage({ type: "roll:new", item });
     }
   };
@@ -374,9 +352,7 @@ export default function App() {
   const onNewSession = () => {
     const ok = window.confirm("Rozpocząć NOWĄ SESJĘ? Wspólna historia zostanie wyczyszczona dla wszystkich.");
     if (!ok) return;
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("session:new");
-    }
+    if (socketRef.current && socketRef.current.connected) socketRef.current.emit("session:new");
     bcRef.current?.postMessage({ type: "session:new" });
     setLog([]);
   };
@@ -385,7 +361,6 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-200">
-      {/* Main grid (left panel + center canvas). Right image library is FIXED and not in flow. */}
       <div className="h-full grid grid-cols-5">
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
@@ -472,7 +447,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Scrollable results frame */}
+            {/* Scrollable results frame (1 wpis na ekran, przewijanie po "kartach") */}
             <div ref={logRef} className="rounded-xl border bg-white/80 overflow-y-auto" style={{height: 'calc(100dvh - 320px)'}}>
               <div className="flex flex-col gap-0 snap-y snap-mandatory h-full">
                 {log.length === 0 ? (
@@ -489,19 +464,15 @@ export default function App() {
               </div>
             </div>
           </div>
-          </div>
         </div>
 
-        {/* Center: canvas area 4/5, RESERVED SPACE for fixed right panel using padding-right */}
+        {/* Right: canvas area 4/5 */}
         <div className="col-span-4 flex min-h-0 ">
           <div className="flex-1 min-h-0 flex flex-col">
             <GridCanvas />
           </div>
         </div>
       </div>
-
-      {/* FIXED Right: image library (out of normal flow, won't push page height) */}
-      
     </div>
   );
 }
