@@ -27,7 +27,6 @@ function NumberPicker({
   const gridCols = rowSize === 10 ? "grid-cols-10" : "grid-cols-5";
   return (
     <div className="mb-3">
-      {/* label + input in one line */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-gray-600">{label}</span>
         <input
@@ -40,7 +39,6 @@ function NumberPicker({
           onChange={(e) => setValue(clamp(e.target.value, min, max))}
         />
       </div>
-      {/* quick buttons */}
       <div className={`mt-2 grid ${gridCols} gap-1`}>
         {q.map((n) => (
           <button
@@ -242,7 +240,6 @@ function LogCard({ item }) {
     },
   };
   const c = colorMap[type];
-  // Fallback kolory inline (gdyby Tailwind nie zadziałał)
   const fallback = {
     SUKCES: { text: "#166534", bg: "#dcfce7", border: "#16a34a" },
     PORAŻKA: { text: "#92400e", bg: "#fef3c7", border: "#92400e" },
@@ -261,7 +258,6 @@ function LogCard({ item }) {
 
   return (
     <div className={`rounded-xl border p-3 bg-white shadow-sm border-l-4 ${c.border}`}>
-      {/* NAZWA GRACZA + STATUS W JEDNEJ LINII */}
       <div className="flex items-baseline gap-3 mb-1 flex-nowrap whitespace-nowrap">
         <div className="text-base font-semibold text-gray-900 shrink-0">
           {item.playerName}:
@@ -286,47 +282,28 @@ function LogCard({ item }) {
         </div>
       </div>
 
-      {/* Poziom trudności pod godziną, nad wynikami */}
       {!isHidden && (
-        <div className="text-xs text-gray-600 mb-1">
-          Poziom trudności: {item.difficulty}
-        </div>
+        <div className="text-xs text-gray-600 mb-1">Poziom trudności: {item.difficulty}</div>
       )}
 
       {isHidden ? (
-        <div className="text-xs text-gray-600">
-          Szczegóły ukryte — widoczne tylko dla rzucającego.
-        </div>
+        <div className="text-xs text-gray-600">Szczegóły ukryte — widoczne tylko dla rzucającego.</div>
       ) : (
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          <div>
-            <span className="font-semibold">Wyniki:</span> {item.baseResults.join(", ")}
-          </div>
-          <div>
-            <span className="font-semibold">Przerzuty:</span>{" "}
-            {item.rerollResults.length ? item.rerollResults.join(", ") : "—"}
-          </div>
-          <div>
-            <span className="font-semibold">Sukcesy naturalne:</span> {item.naturalSuccesses}
-          </div>
-          <div>
-            <span className="font-semibold">AutoSukcesy:</span> {item.autoSucc}
-          </div>
-          <div>
-            <span className="font-semibold">Jedynek:</span> {item.onesBase}{" "}
-            {item.mitigated ? `(–${item.mitigated} niwel.)` : ""} ⇒ {item.onesEffective}
-          </div>
-          <div>
-            <span className="font-semibold">Suma kości:</span> {item.sumAll}
-          </div>
+          <div><span className="font-semibold">Wyniki:</span> {item.baseResults.join(", ")}</div>
+          <div><span className="font-semibold">Przerzuty:</span> {item.rerollResults.length ? item.rerollResults.join(", ") : "—"}</div>
+          <div><span className="font-semibold">Sukcesy naturalne:</span> {item.naturalSuccesses}</div>
+          <div><span className="font-semibold">AutoSukcesy:</span> {item.autoSucc}</div>
+          <div><span className="font-semibold">Jedynek:</span> {item.onesBase} {item.mitigated ? `(–${item.mitigated} niwel.)` : ""} ⇒ {item.onesEffective}</div>
+          <div><span className="font-semibold">Suma kości:</span> {item.sumAll}</div>
         </div>
       )}
     </div>
   );
 }
 
-// --- Attachments: tile + modal --------------------------------------------
-function AttachmentTile({ file, onOpen, onRename, onDelete }) {
+// --- Attachments: tile + popup window -------------------------------------
+function AttachmentTile({ file, onOpen, onRename, onDelete, onToggleHidden }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(file.name);
 
@@ -340,13 +317,13 @@ function AttachmentTile({ file, onOpen, onRename, onDelete }) {
       <button
         className="relative w-full h-28 rounded-md overflow-hidden border mb-2 bg-gray-50"
         onClick={() => onOpen(file)}
-        title="Otwórz podgląd"
+        title="Otwórz w nowym oknie"
       >
-        {isImg ? (
+        {isImg && !file.hidden ? (
           <img src={file.url} alt={file.name} className="w-full h-full object-contain" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-xs text-gray-600">
-            {file.type || ext?.toUpperCase() || "PLIK"}
+            {file.hidden ? "Ukryty" : (file.type || ext?.toUpperCase() || "PLIK")}
           </div>
         )}
       </button>
@@ -379,6 +356,14 @@ function AttachmentTile({ file, onOpen, onRename, onDelete }) {
           <div className="text-xs font-medium truncate flex-1" title={file.name}>
             {file.name}
           </div>
+          {/* Ikona ukryj/pokaż obok nazwy */}
+          <button
+            className="text-xs px-2 py-1 border rounded"
+            onClick={() => onToggleHidden(file.id, !file.hidden)}
+            title={file.hidden ? "Pokaż miniaturę" : "Ukryj miniaturę"}
+          >
+            {file.hidden ? "👁️" : "🙈"}
+          </button>
           <button
             className="text-xs px-2 py-1 border rounded"
             onClick={() => setEditing(true)}
@@ -390,68 +375,9 @@ function AttachmentTile({ file, onOpen, onRename, onDelete }) {
       )}
 
       <div className="mt-2">
-        <button
-          className="text-xs text-red-600 underline"
-          onClick={() => onDelete(file.id)}
-          title="Usuń"
-        >
+        <button className="text-xs text-red-600 underline" onClick={() => onDelete(file.id)} title="Usuń">
           Usuń
         </button>
-      </div>
-    </div>
-  );
-}
-
-function FloatingViewer({ file, onClose }) {
-  const overlayRef = useRef(null);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  if (!file) return null;
-
-  const isImg = file.type.startsWith("image/");
-  const isPdf = file.type === "application/pdf";
-  const isVideo = file.type.startsWith("video/");
-  const isAudio = file.type.startsWith("audio/");
-
-  return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50"
-      style={{ background: "rgba(0,0,0,0.5)" }}
-      onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
-      }}
-    >
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-3 max-w-[90vw] max-h-[85vh] w-fit">
-        <div className="flex items-center justify-between mb-2 gap-4">
-          <div className="text-sm font-semibold truncate max-w-[70vw]" title={file.name}>
-            {file.name}
-          </div>
-          <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>
-            Zamknij
-          </button>
-        </div>
-        <div className="bg-gray-50 rounded-lg border overflow-hidden flex items-center justify-center">
-          {isImg && <img src={file.url} alt={file.name} className="max-w-[88vw] max-h-[75vh] object-contain" />}
-          {isPdf && <embed src={file.url} type="application/pdf" className="w-[88vw] h-[75vh]" />}
-          {isVideo && <video controls src={file.url} className="max-w-[88vw] max-h-[75vh]" />}
-          {isAudio && <audio controls src={file.url} className="w-[80vw]" />}
-          {!isImg && !isPdf && !isVideo && !isAudio && (
-            <div className="p-6 text-sm">
-              Nie można wyświetlić tego typu pliku.{" "}
-              <a href={file.url} download={file.name} className="underline text-blue-600">
-                Pobierz
-              </a>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -478,44 +404,31 @@ export default function App() {
 
   // Historia: trzymamy w localStorage aż do Reset
   const [log, setLog] = useState(() => {
-    try {
-      const raw = localStorage.getItem("dice-log");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    try { const raw = localStorage.getItem("dice-log"); return raw ? JSON.parse(raw) : []; }
+    catch { return []; }
   });
 
   // Załączniki: trzymamy w localStorage (tylko lokalnie u użytkownika)
   const [files, setFiles] = useState(() => {
-    try {
-      const raw = localStorage.getItem("attachments");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    try { const raw = localStorage.getItem("attachments"); return raw ? JSON.parse(raw) : []; }
+    catch { return []; }
   });
-  const [viewerFile, setViewerFile] = useState(null);
+
+  // otwarte popupy (cache po id, żeby otwierać w tej samej karcie okna)
+  const popupsRef = useRef({});
 
   useEffect(() => {
-    try {
-      localStorage.setItem("player-name", playerName || "");
-    } catch {}
+    try { localStorage.setItem("player-name", playerName || ""); } catch {}
   }, [playerName]);
 
   // Obrażenia/Wyparowanie wymuszają PT=6 i przerzut zawsze
   useEffect(() => {
-    if (damageMode) {
-      setDifficulty(6);
-      setRerollExplode(true);
-    }
+    if (damageMode) { setDifficulty(6); setRerollExplode(true); }
   }, [damageMode]);
 
   // zapisuj historię + auto-scroll do góry ramki
   useEffect(() => {
-    try {
-      localStorage.setItem("dice-log", JSON.stringify(log));
-    } catch {}
+    try { localStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
     if (autoScroll && dialogRef.current) {
       dialogRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -523,9 +436,7 @@ export default function App() {
 
   // zapisuj listę plików w localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem("attachments", JSON.stringify(files));
-    } catch {}
+    try { localStorage.setItem("attachments", JSON.stringify(files)); } catch {}
   }, [files]);
 
   const socketRef = useRef(null);
@@ -540,65 +451,40 @@ export default function App() {
       setLog((prev) => [item, ...prev]);
     };
 
-    const s = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      autoConnect: true,
-      withCredentials: false,
-    });
+    const s = io(SOCKET_URL, { transports: ["websocket", "polling"], autoConnect: true, withCredentials: false });
     socketRef.current = s;
     s.on("connect", () => setConnected(true));
     s.on("disconnect", () => setConnected(false));
     s.on("connect_error", () => setConnected(false));
 
-    // NIE nadpisujemy lokalnej historii — dokładamy nowe (do czasu Reset)
     s.on("history", (items) => {
       items.forEach((it) => {
         const key = `${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`;
-        if (!seenRef.current.has(key)) {
-          seenRef.current.add(key);
-          setLog((prev) => [it, ...prev]);
-        }
+        if (!seenRef.current.has(key)) { seenRef.current.add(key); setLog((prev) => [it, ...prev]); }
       });
       bcRef.current?.postMessage({ type: "history-merge", items });
     });
 
-    s.on("roll:new", (item) => {
-      addItem(item);
-      bcRef.current?.postMessage({ type: "roll:new", item });
-    });
+    s.on("roll:new", (item) => { addItem(item); bcRef.current?.postMessage({ type: "roll:new", item }); });
 
     const bc = new BroadcastChannel("dice-roller");
     bcRef.current = bc;
     bc.onmessage = (ev) => {
       const { type, item, items } = ev.data || {};
-      if (type === "roll:new" && item) {
-        addItem(item);
-      }
+      if (type === "roll:new" && item) addItem(item);
       if (type === "history-merge" && Array.isArray(items)) {
         items.forEach((it) => {
           const key = `${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`;
-          if (!seenRef.current.has(key)) {
-            seenRef.current.add(key);
-            setLog((prev) => [it, ...prev]);
-          }
+          if (!seenRef.current.has(key)) { seenRef.current.add(key); setLog((prev) => [it, ...prev]); }
         });
-      }
-      if (type === "session:new") {
-        // nowa sesja nie czyści lokalnej historii — tylko sygnał dla innych
       }
     };
 
-    return () => {
-      s.disconnect();
-      bc.close();
-    };
+    return () => { s.disconnect(); bc.close(); };
   }, []);
 
   const onRoll = () => {
-    if (!playerName.trim()) {
-      alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu.");
-      return;
-    }
+    if (!playerName.trim()) { alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu."); return; }
 
     const payload = {
       diceCount: clamp(diceCount, 1, 20),
@@ -611,12 +497,8 @@ export default function App() {
       damageMode,
     };
 
-    // RZUT UKRYTY: tylko lokalnie (bez socketów i bez BC)
-    if (hidden) {
-      const item = computeRoll(payload);
-      setLog((prev) => [item, ...prev]);
-      return;
-    }
+    // RZUT UKRYTY: tylko lokalnie
+    if (hidden) { const item = computeRoll(payload); setLog((prev) => [item, ...prev]); return; }
 
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("roll:request", payload);
@@ -627,24 +509,15 @@ export default function App() {
   };
 
   const onNewSession = () => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("session:new");
-    }
+    if (socketRef.current && socketRef.current.connected) socketRef.current.emit("session:new");
     bcRef.current?.postMessage({ type: "session:new" });
-    // nie czyścimy lokalnej historii – trzyma się do czasu „Reset”
   };
 
   const onResetLocal = () => {
     if (!confirm("Zresetować lokalną historię rzutów i załączniki?")) return;
-
-    // reset historii rzutów
     seenRef.current = new Set();
     setLog([]);
-    try {
-      localStorage.removeItem("dice-log");
-    } catch {}
-
-    // reset załączników (localStorage + ewentualne stare z sessionStorage)
+    try { localStorage.removeItem("dice-log"); } catch {}
     setFiles([]);
     try {
       localStorage.removeItem("attachments");
@@ -653,19 +526,6 @@ export default function App() {
   };
 
   // --- Attachments handlers ------------------------------------------------
-  const onFilesSelected = async (e) => {
-    const list = e.target.files;
-    if (!list || !list.length) return;
-    const added = [];
-    for (const file of list) {
-      const id = uid();
-      const url = await readAsDataURL(file);
-      added.push({ id, name: file.name, type: file.type || "application/octet-stream", url });
-    }
-    setFiles((prev) => [...added, ...prev]);
-    e.target.value = "";
-  };
-
   const readAsDataURL = (file) =>
     new Promise((res, rej) => {
       const fr = new FileReader();
@@ -674,43 +534,116 @@ export default function App() {
       fr.readAsDataURL(file);
     });
 
-  const renameFile = (id, name) => setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)));
+  const onFilesSelected = async (e) => {
+    const list = e.target.files;
+    if (!list || !list.length) return;
+    const added = [];
+    for (const file of list) {
+      const id = uid();
+      const url = await readAsDataURL(file);
+      added.push({
+        id,
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        url,
+        hidden: true, // DOMYŚLNIE UKRYTE miniatury
+      });
+    }
+    setFiles((prev) => [...added, ...prev]);
+    e.target.value = "";
+  };
+
+  const renameFile = (id, name) =>
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)));
+
   const deleteFile = (id) => setFiles((prev) => prev.filter((f) => f.id !== id));
+
+  const toggleHidden = (id, nextHidden) =>
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, hidden: nextHidden } : f)));
+
+  // Otwórz w OS-owym pop-upie (drag/resize/close)
+  const openInPopup = (file) => {
+    const name = `viewer_${file.id}`;
+    const features = "popup=yes,width=900,height=700,scrollbars=yes,resizable=yes";
+    let w = popupsRef.current[name];
+    try {
+      if (!w || w.closed) {
+        w = window.open("", name, features);
+        popupsRef.current[name] = w;
+      } else {
+        w.focus();
+      }
+      if (!w) return;
+      const isImg = file.type.startsWith("image/");
+      const isPdf = file.type === "application/pdf";
+      const isVideo = file.type.startsWith("video/");
+      const isAudio = file.type.startsWith("audio/");
+      const esc = (s) => (s || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+      const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>${esc(file.name)}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    html,body{height:100%;margin:0;background:#111}
+    .wrap{height:100%;display:flex;align-items:center;justify-content:center;background:#111}
+    .box{background:#000;padding:8px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:96vw;max-height:92vh}
+    img,video,embed{max-width:95vw;max-height:90vh;display:block}
+    audio{width:90vw}
+    .toolbar{position:fixed;top:8px;right:12px;z-index:10}
+    .btn{background:#fff;border:1px solid #ddd;padding:6px 10px;border-radius:8px;font:12px system-ui;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button class="btn" onclick="window.close()">Zamknij</button></div>
+  <div class="wrap"><div class="box">
+    ${
+      isImg
+        ? `<img src="${file.url}" alt="${esc(file.name)}"/>`
+        : isPdf
+        ? `<embed src="${file.url}" type="application/pdf" />`
+        : isVideo
+        ? `<video controls src="${file.url}"></video>`
+        : isAudio
+        ? `<audio controls src="${file.url}"></audio>`
+        : `<div style="background:#111;color:#fff;padding:20px;border-radius:8px">
+             Nie można wyświetlić tego typu pliku. <a href="${file.url}" download="${esc(file.name)}" style="color:#4ea1ff">Pobierz</a>
+           </div>`
+    }
+  </div></div>
+</body>
+</html>`;
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 overflow-x-hidden">
-      {/* Górny pasek z przyciskami (bez napisu i bez auto-scroll) */}
+      {/* Górny pasek z przyciskami */}
       <div
         className="w-full bg-white/90 border-b sticky top-0 z-20"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          background: "#ffffffcc",
-          backdropFilter: "saturate(180%) blur(4px)",
-          borderBottom: "1px solid rgba(0,0,0,0.1)",
-        }}
+        style={{ position: "sticky", top: 0, zIndex: 20, background: "#ffffffcc", backdropFilter: "saturate(180%) blur(4px)", borderBottom: "1px solid rgba(0,0,0,0.1)" }}
       >
         <div className="max-w-screen-2xl mx-auto px-4 py-2 flex items-center justify-end gap-3">
-          <button
-            className="text-xs underline"
-            onClick={() => {
-              navigator.clipboard?.writeText(window.location.href);
-            }}
-            title="Kopiuj link do tej sesji"
-          >
-            Kopiuj link
-          </button>
-          <button
-            className="text-xs underline"
-            onClick={onNewSession}
-            title="Rozpocznij nową sesję (bez czyszczenia lokalnej historii)"
-          >
-            Nowa sesja
-          </button>
-          <button className="text-xs underline" onClick={onResetLocal} title="Wyczyść lokalną historię i załączniki">
-            Reset
-          </button>
+          <button className="text-xs underline" onClick={() => { navigator.clipboard?.writeText(window.location.href); }} title="Kopiuj link do tej sesji">Kopiuj link</button>
+          <button className="text-xs underline" onClick={() => {
+            if (socketRef.current && socketRef.current.connected) socketRef.current.emit("session:new");
+            bcRef.current?.postMessage({ type: "session:new" });
+          }} title="Rozpocznij nową sesję (bez czyszczenia lokalnej historii)">Nowa sesja</button>
+          <button className="text-xs underline" onClick={() => {
+            if (!confirm("Zresetować lokalną historię rzutów i załączniki?")) return;
+            seenRef.current = new Set();
+            setLog([]);
+            try { localStorage.removeItem("dice-log"); } catch {}
+            setFiles([]);
+            try { localStorage.removeItem("attachments"); sessionStorage.removeItem("attachments"); } catch {}
+          }} title="Wyczyść lokalną historię i załączniki">Reset</button>
         </div>
       </div>
 
@@ -718,7 +651,7 @@ export default function App() {
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
           <div className="p-4 space-y-4 flex flex-col">
-            {/* Nazwa gracza (zapamiętywana) */}
+            {/* Nazwa gracza */}
             <div className="mb-3">
               <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-semibold text-gray-600">Nazwa gracza *</label>
@@ -744,15 +677,11 @@ export default function App() {
 
             {/* Obrażenia/Wyparowanie */}
             <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={damageMode}
-                onChange={(e) => setDamageMode(e.target.checked)}
-              />
+              <input type="checkbox" checked={damageMode} onChange={(e) => setDamageMode(e.target.checked)} />
               <span>OBRAŻENIA/WYPAROWANIE</span>
             </label>
 
-            {/* PT: tylko szybkie guziki 1–10 (2x5), pole może wpisać >10 */}
+            {/* PT: tylko szybkie guziki 1–10 (2x5) */}
             <NumberPicker
               label="Poziom trudności (PT)"
               min={1}
@@ -804,7 +733,28 @@ export default function App() {
             </div>
 
             <button
-              onClick={onRoll}
+              onClick={() => {
+                if (!playerName.trim()) { alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu."); return; }
+                const payload = {
+                  diceCount: clamp(diceCount, 1, 20),
+                  difficulty: clamp(difficulty, 1, 20),
+                  autoSucc: clamp(autoSucc, 0, 5),
+                  rerollExplode,
+                  mitigateOnes: damageMode ? 100000 : clamp(mitigateOnes, 0, 5),
+                  playerName: playerName.trim(),
+                  hidden,
+                  damageMode,
+                };
+                if (hidden) {
+                  const item = computeRoll(payload);
+                  setLog((prev) => [item, ...prev]);
+                } else if (socketRef.current && socketRef.current.connected) {
+                  socketRef.current.emit("roll:request", payload);
+                } else {
+                  const item = computeRoll(payload);
+                  setLog((prev) => [item, ...prev]);
+                }
+              }}
               disabled={!playerName.trim()}
               className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Wykonaj rzut"
@@ -812,29 +762,15 @@ export default function App() {
               RZUT!
             </button>
 
-            {/* Ramka: ostatni wynik + historia (bez duplikatu pierwszego) */}
+            {/* Ramka: ostatni wynik + historia */}
             <div
               ref={dialogRef}
               className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl"
-              style={{
-                overflowY: "auto",
-                resize: "vertical",
-                height: "50vh",
-                minHeight: "220px",
-                maxHeight: "80dvh",
-                padding: "8px",
-              }}
+              style={{ overflowY: "auto", resize: "vertical", height: "50vh", minHeight: "220px", maxHeight: "80dvh", padding: "8px" }}
             >
-              {/* Ostatni rzut */}
               <div style={{ padding: "6px" }}>
-                {log[0] ? (
-                  <LogCard item={log[0]} />
-                ) : (
-                  <div style={{ fontSize: "12px", color: "#6b7280" }}>Brak wyniku.</div>
-                )}
+                {log[0] ? <LogCard item={log[0]} /> : <div style={{ fontSize: "12px", color: "#6b7280" }}>Brak wyniku.</div>}
               </div>
-
-              {/* Historia bez powtarzania najnowszego */}
               <div style={{ borderTop: "1px solid #e5e7eb", padding: "8px 6px" }}>
                 <div className="space-y-2 pr-1">
                   {log.length <= 1 ? (
@@ -864,9 +800,10 @@ export default function App() {
                     <AttachmentTile
                       key={f.id}
                       file={f}
-                      onOpen={setViewerFile}
+                      onOpen={openInPopup}
                       onRename={renameFile}
                       onDelete={deleteFile}
+                      onToggleHidden={toggleHidden}
                     />
                   ))}
                 </div>
@@ -883,9 +820,6 @@ export default function App() {
           </div>
         </div>
       </div>
-
-      {/* Floating viewer (modal) */}
-      <FloatingViewer file={viewerFile} onClose={() => setViewerFile(null)} />
     </div>
   );
 }
