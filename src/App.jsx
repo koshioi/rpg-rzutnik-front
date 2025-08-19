@@ -219,14 +219,7 @@ export default function App() {
 
   const [connected, setConnected] = useState(false);
 
-  // enforce no-page-scroll and full-height root
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.id = 'no-scroll-style';
-    style.innerHTML = 'html,body,#root{height:100%;overflow:hidden;margin:0;padding:0}';
-    document.head.appendChild(style);
-    return () => { document.getElementById('no-scroll-style')?.remove(); };
-  }, []);
+  // (usunięto globalny blokujący scroll styl)
 
   const [autoScroll, setAutoScroll] = useState(true);
   const logRef = useRef(null);
@@ -335,11 +328,11 @@ export default function App() {
   const clearLog = () => setLog([]);
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-200">
-      <div className="h-full grid grid-cols-5">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 overflow-x-hidden">
+      <div className="grid grid-cols-5 gap-0 min-h-[70vh]">
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
-          <div className="p-4 space-y-4 flex flex-col h-full overflow-hidden">
+          <div className="p-4 space-y-4 flex flex-col">
             {/* Nazwa gracza */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Nazwa gracza *</label>
@@ -409,8 +402,8 @@ export default function App() {
         </div>
 
         {/* Right: canvas area 4/5 */}
-        <div className="col-span-4 flex min-h-0 ">
-          <div className="flex-1 min-h-0 flex flex-col">
+        <div className="col-span-4">
+          <div className="h-[75vh]">
             <GridCanvas />
           </div>
         </div>
