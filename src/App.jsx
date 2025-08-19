@@ -14,34 +14,38 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
   const q = quick.length ? quick : Array.from({ length: max - min + 1 }, (_, i) => i + min);
   const gridCols = rowSize === 10 ? 'grid-cols-10' : 'grid-cols-5';
   return (
-    <div className="mb-4">
-      <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
-      <div className="flex gap-2 items-start">
+    <div className="mb-3">
+      {/* label + input in one line */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-gray-600">{label}</span>
         <input
           type="number"
-          className="w-20 rounded-md border px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-24 rounded-md border px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           min={min}
           max={max}
           disabled={disabled}
           value={value}
           onChange={(e) => setValue(clamp(e.target.value, min, max))}
         />
-        <div className={`grid ${gridCols} gap-1 w-full`}>
-          {q.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setValue(n)}
-              disabled={disabled}
-              className={`px-2 py-1 rounded-md text-xs border text-center disabled:opacity-50 disabled:cursor-not-allowed ${
-                value === n ? "bg-gray-900 text-white" : "hover:bg-gray-100"
-              }`}
-              aria-label={`${label} ${n}`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
+      </div>
+      {/* two rows of quick buttons (1–10 
+ 11–20) or (1–5 
+ 6–10) */}
+      <div className={`mt-2 grid ${gridCols} gap-1`}>
+        {q.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => setValue(n)}
+            disabled={disabled}
+            className={`px-2 py-1 rounded-md text-xs border text-center disabled:opacity-50 disabled:cursor-not-allowed ${
+              value === n ? "bg-gray-900 text-white" : "hover:bg-gray-100"
+            }`}
+            aria-label={`${label} ${n}`}
+          >
+            {n}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -222,7 +226,7 @@ export default function App() {
   // (usunięto globalny blokujący scroll styl)
 
   const [autoScroll, setAutoScroll] = useState(true);
-  const logRef = useRef(null);
+  const dialogRef = useRef(null);
 
   const [log, setLog] = useState(() => {
     try { const raw = sessionStorage.getItem("dice-log"); return raw ? JSON.parse(raw) : []; } catch { return []; }
@@ -235,7 +239,7 @@ export default function App() {
 
   useEffect(() => {
     try { sessionStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
-    if (autoScroll && logRef.current) { logRef.current.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (autoScroll && dialogRef.current) { dialogRef.current.scrollTo({ top: 0, behavior: 'smooth' }); }
   }, [log, autoScroll]);
 
   const socketRef = useRef(null);
@@ -334,14 +338,16 @@ export default function App() {
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
           <div className="p-4 space-y-4 flex flex-col">
             {/* Nazwa gracza */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Nazwa gracza *</label>
-              <input
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="np. Anka"
-                className="w-full rounded-md border px-2 py-1 text-sm"
-              />
+            <div className="mb-3">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold text-gray-600">Nazwa gracza *</label>
+                <input
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="np. Anka"
+                  className="w-44 md:w-56 rounded-md border px-2 py-1 text-sm"
+                />
+              </div>
             </div>
 
             <NumberPicker label="Ilość kości" min={1} max={20} value={diceCount} setValue={setDiceCount} quick={Array.from({length:20},(_,i)=>i+1)} rowSize={10} />
@@ -369,10 +375,11 @@ export default function App() {
             <button onClick={onRoll} disabled={!playerName.trim()} className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Wykonaj rzut">RZUT!</button>
 
             {/* Okno dialogowe: ostatni wynik + historia (resizable) */}
-            <div className="mt-3 rounded-xl border bg-white/90 overflow-auto resize-y min-h-[260px] max-h-[80dvh]">
+            <div ref={dialogRef} className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl overflow-y-auto resize-y h-[50vh] min-h-[220px] max-h-[80dvh]">
               {/* Nagłówek */}
-              <div className="sticky top-0 z-10 bg-white/90 border-b p-2">
-                <div className="text-xs text-gray-500">Wynik (ostatni rzut)</div>
+              <div className="sticky top-0 z-10 bg-white border-b p-2 flex items-center justify-between">
+                <div className="text-sm font-semibold">OKNO DIALOGOWE</div>
+                <div className="text-[11px] text-gray-500">ostatni wynik + historia</div>
               </div>
               {/* Ostatni rzut */}
               <div className="p-2">
@@ -389,7 +396,7 @@ export default function App() {
                     <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
                   </div>
                 </div>
-                <div ref={logRef} className="space-y-2 pr-1">
+                <div className="space-y-2 pr-1">
                   {log.length === 0 ? (
                     <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
                   ) : (
