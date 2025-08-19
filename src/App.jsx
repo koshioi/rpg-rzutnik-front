@@ -7,12 +7,22 @@ const SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://localhost:3001";
 // --- Helpers ---------------------------------------------------------------
 const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
 const d10 = () => Math.floor(Math.random() * 10) + 1; // 1..10
-const timeStr = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const timeStr = (d) =>
+  d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 // --- Number Picker ---------------------------------------------------------
-function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], disabled = false, rowSize = 10 }) {
+function NumberPicker({
+  label,
+  min = 0,
+  max = 20,
+  value,
+  setValue,
+  quick = [],
+  disabled = false,
+  rowSize = 10,
+}) {
   const q = quick.length ? quick : Array.from({ length: max - min + 1 }, (_, i) => i + min);
-  const gridCols = rowSize === 10 ? 'grid-cols-10' : 'grid-cols-5';
+  const gridCols = rowSize === 10 ? "grid-cols-10" : "grid-cols-5";
   return (
     <div className="mb-3">
       {/* label + input in one line */}
@@ -28,9 +38,7 @@ function NumberPicker({ label, min = 0, max = 20, value, setValue, quick = [], d
           onChange={(e) => setValue(clamp(e.target.value, min, max))}
         />
       </div>
-      {/* two rows of quick buttons (1–10 
- 11–20) or (1–5 
- 6–10) */}
+      {/* quick buttons */}
       <div className={`mt-2 grid ${gridCols} gap-1`}>
         {q.map((n) => (
           <button
@@ -82,8 +90,14 @@ function GridCanvas() {
     ctx.beginPath();
     ctx.lineWidth = 1;
     ctx.strokeStyle = "#e5e7eb";
-    for (let x = 0; x <= w; x += step) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); }
-    for (let y = 0; y <= h; y += step) { ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); }
+    for (let x = 0; x <= w; x += step) {
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, h);
+    }
+    for (let y = 0; y <= h; y += step) {
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(w, y + 0.5);
+    }
     ctx.stroke();
   };
 
@@ -104,9 +118,20 @@ function GridCanvas() {
 }
 
 // --- Dice logic ------------------------------------------------------------
-function rollDiceSet(count) { return Array.from({ length: count }, d10); }
+function rollDiceSet(count) {
+  return Array.from({ length: count }, d10);
+}
 
-function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateOnes, playerName, hidden, damageMode }) {
+function computeRoll({
+  diceCount,
+  difficulty,
+  autoSucc,
+  rerollExplode,
+  mitigateOnes,
+  playerName,
+  hidden,
+  damageMode,
+}) {
   const effDifficulty = damageMode ? 6 : difficulty;
   const effReroll = damageMode ? true : rerollExplode;
 
@@ -116,7 +141,7 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   const onesBase = base.filter((v) => v === 1).length;
   const succBase = base.filter((v) => v >= effDifficulty).length;
 
-  const effMitigate = damageMode ? Math.max(100000, mitigateOnes || 0) : (mitigateOnes || 0);
+  const effMitigate = damageMode ? Math.max(100000, mitigateOnes || 0) : mitigateOnes || 0;
   const mitigated = Math.min(effMitigate, onesBase);
   let onesEffective = Math.max(0, onesBase - mitigated);
 
@@ -156,12 +181,29 @@ function computeRoll({ diceCount, difficulty, autoSucc, rerollExplode, mitigateO
   else if (finalSuccesses > 0) resultType = "SUKCES";
 
   return {
-    playerName, hidden, timestamp: new Date().toISOString(),
-    diceCount, difficulty: effDifficulty, autoSucc,
-    baseResults: base, rerollResults, sumBase, sumAll,
-    tensBase, onesBase, mitigated, onesEffective, cancelledRerolls,
-    succBase, succRerolls, naturalSuccesses, successesBeforeOnes,
-    finalSuccesses, leftoverBadLuck, resultType, damageMode,
+    playerName,
+    hidden,
+    timestamp: new Date().toISOString(),
+    diceCount,
+    difficulty: effDifficulty,
+    autoSucc,
+    baseResults: base,
+    rerollResults,
+    sumBase,
+    sumAll,
+    tensBase,
+    onesBase,
+    mitigated,
+    onesEffective,
+    cancelledRerolls,
+    succBase,
+    succRerolls,
+    naturalSuccesses,
+    successesBeforeOnes,
+    finalSuccesses,
+    leftoverBadLuck,
+    resultType,
+    damageMode,
   };
 }
 
@@ -172,44 +214,96 @@ function LogCard({ item }) {
   const type = isHidden ? "UKRYTY" : item.resultType;
 
   const colorMap = {
-    SUKCES: { text: "text-green-700 font-bold", bg: "bg-green-100", ring: "ring-green-600", border: "border-green-600" },
-    PORAŻKA: { text: "text-amber-800 font-bold", bg: "bg-amber-100", ring: "ring-amber-700", border: "border-amber-700" },
-    PECH:   { text: "text-red-700 font-bold",   bg: "bg-red-100",   ring: "ring-red-600",   border: "border-red-600" },
-    UKRYTY: { text: "text-gray-900 font-bold",  bg: "bg-gray-100",  ring: "ring-gray-600",  border: "border-gray-400" },
+    SUKCES: {
+      text: "text-green-700 font-bold",
+      bg: "bg-green-100",
+      ring: "ring-green-600",
+      border: "border-green-600",
+    },
+    PORAŻKA: {
+      text: "text-amber-800 font-bold",
+      bg: "bg-amber-100",
+      ring: "ring-amber-700",
+      border: "border-amber-700",
+    },
+    PECH: {
+      text: "text-red-700 font-bold",
+      bg: "bg-red-100",
+      ring: "ring-red-600",
+      border: "border-red-600",
+    },
+    UKRYTY: {
+      text: "text-gray-900 font-bold",
+      bg: "bg-gray-100",
+      ring: "ring-gray-600",
+      border: "border-gray-400",
+    },
   };
   const c = colorMap[type];
-  // Fallback kolory, gdyby klasy Tailwind nie zadziałały
+  // Fallback kolory inline (gdyby Tailwind nie zadziałał)
   const fallback = {
-    SUKCES: { text: '#166534', bg: '#dcfce7', border: '#16a34a' },
-    PORAŻKA:{ text: '#92400e', bg: '#fef3c7', border: '#92400e' },
-    PECH:   { text: '#b91c1c', bg: '#fee2e2', border: '#b91c1c' },
-    UKRYTY: { text: '#111827', bg: '#f3f4f6', border: '#9ca3af' },
+    SUKCES: { text: "#166534", bg: "#dcfce7", border: "#16a34a" },
+    PORAŻKA: { text: "#92400e", bg: "#fef3c7", border: "#92400e" },
+    PECH: { text: "#b91c1c", bg: "#fee2e2", border: "#b91c1c" },
+    UKRYTY: { text: "#111827", bg: "#f3f4f6", border: "#9ca3af" },
   }[type];
 
   const label = isHidden
     ? "RZUT UKRYTY"
-    : item.resultType + (item.resultType === "SUKCES" ? `!(${item.finalSuccesses})` : item.resultType === "PECH" ? `!(${item.leftoverBadLuck})` : "");
+    : item.resultType +
+      (item.resultType === "SUKCES"
+        ? `!(${item.finalSuccesses})`
+        : item.resultType === "PECH"
+        ? `!(${item.leftoverBadLuck})`
+        : "");
 
   return (
     <div className={`rounded-xl border p-3 bg-white shadow-sm border-l-4 ${c.border}`}>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-1">
         <div className="text-base font-semibold text-gray-900">{item.playerName}:</div>
-        <div className={`text-3xl md:text-4xl font-black tracking-tight ${c.text}`}>
-          <span className={`inline-block ${c.bg} ${c.text} ring-1 ${c.ring} rounded-lg px-2 py-1`} style={{ background: fallback.bg, color: fallback.text, border: `1px solid ${fallback.border}` }}>{label}</span>
+        <div
+          className={`text-3xl md:text-4xl font-black tracking-tight ${c.text}`}
+          style={{ color: fallback.text }}
+        >
+          <span
+            className={`inline-block ${c.bg} ${c.text} rounded-lg px-2 py-1`}
+            style={{ background: fallback.bg, color: fallback.text, border: `1px solid ${fallback.border}` }}
+          >
+            {label}
+          </span>
         </div>
         <div className="text-xs text-gray-500 ml-auto">{timeStr(when)}</div>
       </div>
+
+      {/* Poziom trudności pod godziną, nad wynikami */}
+      {!isHidden && (
+        <div className="text-xs text-gray-600 mb-1">Poziom trudności: {item.difficulty}</div>
+      )}
 
       {isHidden ? (
         <div className="text-xs text-gray-600">Szczegóły ukryte — widoczne tylko dla rzucającego.</div>
       ) : (
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          <div><span className="font-semibold">Wyniki:</span> {item.baseResults.join(", ")}</div>
-          <div><span className="font-semibold">Przerzuty:</span> {item.rerollResults.length ? item.rerollResults.join(", ") : "—"}</div>
-          <div><span className="font-semibold">Sukcesy naturalne:</span> {item.naturalSuccesses}</div>
-          <div><span className="font-semibold">AutoSukcesy:</span> {item.autoSucc}</div>
-          <div><span className="font-semibold">Jedynek:</span> {item.onesBase} {item.mitigated ? `(–${item.mitigated} niwel.)` : ""} ⇒ {item.onesEffective}</div>
-          <div><span className="font-semibold">Suma kości:</span> {item.sumAll}</div>
+          <div>
+            <span className="font-semibold">Wyniki:</span> {item.baseResults.join(", ")}
+          </div>
+          <div>
+            <span className="font-semibold">Przerzuty:</span>{" "}
+            {item.rerollResults.length ? item.rerollResults.join(", ") : "—"}
+          </div>
+          <div>
+            <span className="font-semibold">Sukcesy naturalne:</span> {item.naturalSuccesses}
+          </div>
+          <div>
+            <span className="font-semibold">AutoSukcesy:</span> {item.autoSucc}
+          </div>
+          <div>
+            <span className="font-semibold">Jedynek:</span> {item.onesBase}{" "}
+            {item.mitigated ? `(–${item.mitigated} niwel.)` : ""} ⇒ {item.onesEffective}
+          </div>
+          <div>
+            <span className="font-semibold">Suma kości:</span> {item.sumAll}
+          </div>
         </div>
       )}
     </div>
@@ -219,7 +313,7 @@ function LogCard({ item }) {
 // --- Main App --------------------------------------------------------------
 export default function App() {
   // form state
-  const [playerName, setPlayerName] = useState("");
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem("player-name") || "");
   const [diceCount, setDiceCount] = useState(5);
   const [difficulty, setDifficulty] = useState(6);
   const [autoSucc, setAutoSucc] = useState(0);
@@ -230,23 +324,44 @@ export default function App() {
 
   const [connected, setConnected] = useState(false);
 
-  // (usunięto globalny blokujący scroll styl)
+  // auto-scroll zawsze włączony (bez UI)
+  const [autoScroll] = useState(true);
 
-  const [autoScroll, setAutoScroll] = useState(true);
   const dialogRef = useRef(null);
 
+  // Historia: trzymamy w localStorage aż do Reset
   const [log, setLog] = useState(() => {
-    try { const raw = sessionStorage.getItem("dice-log"); return raw ? JSON.parse(raw) : []; } catch { return []; }
+    try {
+      const raw = localStorage.getItem("dice-log");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
   });
+
+  // zapamiętuj nazwę gracza
+  useEffect(() => {
+    try {
+      localStorage.setItem("player-name", playerName || "");
+    } catch {}
+  }, [playerName]);
 
   // Obrażenia/Wyparowanie wymuszają PT=6 i przerzut zawsze
   useEffect(() => {
-    if (damageMode) { setDifficulty(6); setRerollExplode(true); }
+    if (damageMode) {
+      setDifficulty(6);
+      setRerollExplode(true);
+    }
   }, [damageMode]);
 
+  // zapisuj historię + auto-scroll do góry ramki
   useEffect(() => {
-    try { sessionStorage.setItem("dice-log", JSON.stringify(log)); } catch {}
-    if (autoScroll && dialogRef.current) { dialogRef.current.scrollTo({ top: 0, behavior: 'smooth' }); }
+    try {
+      localStorage.setItem("dice-log", JSON.stringify(log));
+    } catch {}
+    if (autoScroll && dialogRef.current) {
+      dialogRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, [log, autoScroll]);
 
   const socketRef = useRef(null);
@@ -261,18 +376,26 @@ export default function App() {
       setLog((prev) => [item, ...prev]);
     };
 
-    const s = io(SOCKET_URL, { transports: ["websocket", "polling"], autoConnect: true, withCredentials: false });
+    const s = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      autoConnect: true,
+      withCredentials: false,
+    });
     socketRef.current = s;
     s.on("connect", () => setConnected(true));
     s.on("disconnect", () => setConnected(false));
     s.on("connect_error", () => setConnected(false));
 
+    // NIE nadpisujemy lokalnej historii — dokładamy nowe (do czasu Reset)
     s.on("history", (items) => {
-      const newSeen = new Set();
-      items.forEach((it) => newSeen.add(`${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`));
-      seenRef.current = newSeen;
-      setLog(items);
-      bcRef.current?.postMessage({ type: "history", items });
+      items.forEach((it) => {
+        const key = `${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`;
+        if (!seenRef.current.has(key)) {
+          seenRef.current.add(key);
+          setLog((prev) => [it, ...prev]);
+        }
+      });
+      bcRef.current?.postMessage({ type: "history-merge", items });
     });
 
     s.on("roll:new", (item) => {
@@ -284,21 +407,34 @@ export default function App() {
     bcRef.current = bc;
     bc.onmessage = (ev) => {
       const { type, item, items } = ev.data || {};
-      if (type === "roll:new" && item) addItem(item);
-      if (type === "history" && Array.isArray(items)) {
-        const newSeen = new Set();
-        items.forEach((it) => newSeen.add(`${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`));
-        seenRef.current = newSeen;
-        setLog(items);
+      if (type === "roll:new" && item) {
+        addItem(item);
       }
-      if (type === "session:new") { seenRef.current = new Set(); setLog([]); }
+      if (type === "history-merge" && Array.isArray(items)) {
+        items.forEach((it) => {
+          const key = `${it.timestamp}|${it.playerName}|${it.sumAll || 0}|${it.naturalSuccesses || 0}`;
+          if (!seenRef.current.has(key)) {
+            seenRef.current.add(key);
+            setLog((prev) => [it, ...prev]);
+          }
+        });
+      }
+      if (type === "session:new") {
+        // nowa sesja nie czyści lokalnej historii — tylko sygnał dla innych
+      }
     };
 
-    return () => { s.disconnect(); bc.close(); };
+    return () => {
+      s.disconnect();
+      bc.close();
+    };
   }, []);
 
   const onRoll = () => {
-    if (!playerName.trim()) { alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu."); return; }
+    if (!playerName.trim()) {
+      alert("Podaj nazwę gracza – bez tego nie można wykonać rzutu.");
+      return;
+    }
 
     const payload = {
       diceCount: clamp(diceCount, 1, 20),
@@ -311,7 +447,6 @@ export default function App() {
       damageMode,
     };
 
-    // Rzut ukryty: lokalnie, bez serwera
     if (hidden) {
       const item = computeRoll(payload);
       setLog((prev) => [item, ...prev]);
@@ -329,27 +464,52 @@ export default function App() {
   };
 
   const onNewSession = () => {
-    const ok = window.confirm("Rozpocząć NOWĄ SESJĘ? Wspólna historia zostanie wyczyszczona dla wszystkich.");
-    if (!ok) return;
-    if (socketRef.current && socketRef.current.connected) socketRef.current.emit("session:new");
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("session:new");
+    }
     bcRef.current?.postMessage({ type: "session:new" });
-    setLog([]);
+    // UWAGA: nie czyścimy lokalnej historii – trzyma się do czasu „Reset”.
   };
 
-  const clearLog = () => setLog([]);
+  const onResetLocal = () => {
+    if (!confirm("Zresetować lokalną historię rzutów?")) return;
+    seenRef.current = new Set();
+    setLog([]);
+    try {
+      localStorage.removeItem("dice-log");
+    } catch {}
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 overflow-x-hidden">
-      {/* Pasek historii przeniesiony na górę strony */}
-      <div className="w-full bg-white/90 border-b sticky top-0 z-20" style={{position:'sticky', top:0, zIndex:20, background:'#ffffffcc', backdropFilter:'saturate(180%) blur(4px)', borderBottom:'1px solid rgba(0,0,0,0.1)'}}>
-        <div className="max-w-screen-2xl mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="text-xs text-gray-600">Historia sesji (wspólna)</div>
-          <div className="flex items-center gap-3">
-            <button className="text-xs underline" onClick={() => { navigator.clipboard?.writeText(window.location.href); }} title="Kopiuj link do tej sesji">Kopiuj link</button>
-            <label className="text-xs inline-flex items-center gap-1"><input type="checkbox" checked={autoScroll} onChange={(e)=>setAutoScroll(e.target.checked)} /> Auto-scroll</label>
-            <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
-            <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
-          </div>
+      {/* Górny pasek z przyciskami (bez napisu i bez auto-scroll) */}
+      <div
+        className="w-full bg-white/90 border-b sticky top-0 z-20"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          background: "#ffffffcc",
+          backdropFilter: "saturate(180%) blur(4px)",
+          borderBottom: "1px solid rgba(0,0,0,0.1)",
+        }}
+      >
+        <div className="max-w-screen-2xl mx-auto px-4 py-2 flex items-center justify-end gap-3">
+          <button
+            className="text-xs underline"
+            onClick={() => {
+              navigator.clipboard?.writeText(window.location.href);
+            }}
+            title="Kopiuj link do tej sesji"
+          >
+            Kopiuj link
+          </button>
+          <button className="text-xs underline" onClick={onNewSession} title="Rozpocznij nową sesję (bez czyszczenia lokalnej historii)">
+            Nowa sesja
+          </button>
+          <button className="text-xs underline" onClick={onResetLocal} title="Wyczyść lokalną historię">
+            Reset
+          </button>
         </div>
       </div>
 
@@ -357,7 +517,7 @@ export default function App() {
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
           <div className="p-4 space-y-4 flex flex-col">
-            {/* Nazwa gracza */}
+            {/* Nazwa gracza (zapamiętywana) */}
             <div className="mb-3">
               <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-semibold text-gray-600">Nazwa gracza *</label>
@@ -370,65 +530,116 @@ export default function App() {
               </div>
             </div>
 
-            <NumberPicker label="Ilość kości" min={1} max={20} value={diceCount} setValue={setDiceCount} quick={Array.from({length:20},(_,i)=>i+1)} rowSize={10} />
+            {/* Ilość kości: 1–20 (2x10) */}
+            <NumberPicker
+              label="Ilość kości"
+              min={1}
+              max={20}
+              value={diceCount}
+              setValue={setDiceCount}
+              quick={Array.from({ length: 20 }, (_, i) => i + 1)}
+              rowSize={10}
+            />
 
+            {/* Obrażenia/Wyparowanie */}
             <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={damageMode} onChange={(e) => setDamageMode(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={damageMode}
+                onChange={(e) => setDamageMode(e.target.checked)}
+              />
               <span>OBRAŻENIA/WYPAROWANIE</span>
             </label>
 
-            <NumberPicker label="Poziom trudności (PT)" min={1} max={20} value={difficulty} setValue={setDifficulty} quick={Array.from({length:20},(_,i)=>i+1)} disabled={damageMode} rowSize={10} />
-            <NumberPicker label="Automatyczne sukcesy" min={0} max={5} value={autoSucc} setValue={setAutoSucc} quick={[0,1,2,3,4,5]} rowSize={5} />
+            {/* PT: tylko szybkie guziki 1–10 (2x5), pole może wpisać >10 */}
+            <NumberPicker
+              label="Poziom trudności (PT)"
+              min={1}
+              max={20}
+              value={difficulty}
+              setValue={setDifficulty}
+              quick={Array.from({ length: 10 }, (_, i) => i + 1)}
+              disabled={damageMode}
+              rowSize={5}
+            />
+
+            {/* Auto-sukcesy */}
+            <NumberPicker
+              label="Automatyczne sukcesy"
+              min={0}
+              max={5}
+              value={autoSucc}
+              setValue={setAutoSucc}
+              quick={[0, 1, 2, 3, 4, 5]}
+              rowSize={5}
+            />
 
             <div className="flex flex-col gap-3">
               <label className="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={damageMode ? true : rerollExplode} disabled={damageMode} onChange={(e) => !damageMode && setRerollExplode(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={damageMode ? true : rerollExplode}
+                  disabled={damageMode}
+                  onChange={(e) => !damageMode && setRerollExplode(e.target.checked)}
+                />
                 <span>Przerzut</span>
               </label>
-              <NumberPicker label="Niwelowanie pecha" min={0} max={5} value={mitigateOnes} setValue={setMitigateOnes} quick={[0,1,2,3,4,5]} disabled={damageMode} rowSize={5} />
+
+              <NumberPicker
+                label="Niwelowanie pecha"
+                min={0}
+                max={5}
+                value={mitigateOnes}
+                setValue={setMitigateOnes}
+                quick={[0, 1, 2, 3, 4, 5]}
+                disabled={damageMode}
+                rowSize={5}
+              />
+
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} />
                 <span>Rzut ukryty</span>
               </label>
             </div>
 
-            <button onClick={onRoll} disabled={!playerName.trim()} className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Wykonaj rzut">RZUT!</button>
+            <button
+              onClick={onRoll}
+              disabled={!playerName.trim()}
+              className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Wykonaj rzut"
+            >
+              RZUT!
+            </button>
 
-            {/* Okno dialogowe: wynik + historia (scroll wewnętrzny) */}
+            {/* Ramka: ostatni wynik + historia (bez duplikatu pierwszego) */}
             <div
               ref={dialogRef}
-              className="dialog-frame"
+              className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl"
               style={{
-                marginTop: '12px',
-                overflowY: 'auto',
-                resize: 'vertical',
-                height: '50vh',
-                minHeight: '220px',
-                maxHeight: '80dvh',
-                border: '2px solid #1f2937',
-                borderRadius: '16px',
-                background: '#ffffff',
-                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
-                padding: '8px'
+                overflowY: "auto",
+                resize: "vertical",
+                height: "50vh",
+                minHeight: "220px",
+                maxHeight: "80dvh",
+                padding: "8px",
               }}
             >
               {/* Ostatni rzut */}
-              <div className="p-2">
+              <div style={{ padding: "6px" }}>
                 {log[0] ? (
                   <LogCard item={log[0]} />
                 ) : (
-                  <div className="text-xs text-gray-500">Brak wyniku.</div>
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>Brak wyniku.</div>
                 )}
               </div>
 
-              {/* Historia w tej samej ramce */}
-              <div className="border-t p-2">
-                <div className="text-xs text-gray-500 mb-2">Historia sesji (wspólna)</div>
+              {/* Historia bez powtarzania najnowszego */}
+              <div style={{ borderTop: "1px solid #e5e7eb", padding: "8px 6px" }}>
                 <div className="space-y-2 pr-1">
                   {log.length <= 1 ? (
                     <div className="text-xs text-gray-500">Brak starszych rzutów.</div>
                   ) : (
-                    log.slice(1).map((item, i) => <LogCard key={(i+1) + item.timestamp} item={item} />)
+                    log.slice(1).map((item, i) => <LogCard key={(i + 1) + item.timestamp} item={item} />)
                   )}
                 </div>
               </div>
