@@ -178,6 +178,13 @@ function LogCard({ item }) {
     UKRYTY: { text: "text-gray-900 font-bold",  bg: "bg-gray-100",  ring: "ring-gray-600",  border: "border-gray-400" },
   };
   const c = colorMap[type];
+  // Fallback kolory, gdyby klasy Tailwind nie zadziałały
+  const fallback = {
+    SUKCES: { text: '#166534', bg: '#dcfce7', border: '#16a34a' },
+    PORAŻKA:{ text: '#92400e', bg: '#fef3c7', border: '#92400e' },
+    PECH:   { text: '#b91c1c', bg: '#fee2e2', border: '#b91c1c' },
+    UKRYTY: { text: '#111827', bg: '#f3f4f6', border: '#9ca3af' },
+  }[type];
 
   const label = isHidden
     ? "RZUT UKRYTY"
@@ -188,7 +195,7 @@ function LogCard({ item }) {
       <div className="flex items-center gap-2 mb-2">
         <div className="text-base font-semibold text-gray-900">{item.playerName}:</div>
         <div className={`text-3xl md:text-4xl font-black tracking-tight ${c.text}`}>
-          <span className={`inline-block ${c.bg} ${c.text} ring-1 ${c.ring} rounded-lg px-2 py-1`}>{label}</span>
+          <span className={`inline-block ${c.bg} ${c.text} ring-1 ${c.ring} rounded-lg px-2 py-1`} style={{ background: fallback.bg, color: fallback.text, border: `1px solid ${fallback.border}` }}>{label}</span>
         </div>
         <div className="text-xs text-gray-500 ml-auto">{timeStr(when)}</div>
       </div>
@@ -377,8 +384,20 @@ export default function App() {
             {/* Okno dialogowe: wynik + historia (scroll wewnętrzny) */}
             <div
               ref={dialogRef}
-              className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl
-                         overflow-auto resize-y h-[50vh] min-h-[220px] max-h-[80dvh]"
+              className="dialog-frame"
+              style={{
+                marginTop: '12px',
+                overflowY: 'auto',
+                resize: 'vertical',
+                height: '50vh',
+                minHeight: '220px',
+                maxHeight: '80dvh',
+                border: '2px solid #1f2937',
+                borderRadius: '16px',
+                background: '#ffffff',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+                padding: '8px'
+              }}
             >
               {/* Ostatni rzut */}
               <div className="p-2">
