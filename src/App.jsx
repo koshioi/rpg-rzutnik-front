@@ -9,6 +9,8 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
 const d10 = () => Math.floor(Math.random() * 10) + 1; // 1..10
 const timeStr = (d) =>
   d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const getExt = (name) => (name.includes(".") ? name.split(".").pop().toLowerCase() : "");
 
 // --- Number Picker ---------------------------------------------------------
 function NumberPicker({
@@ -323,6 +325,138 @@ function LogCard({ item }) {
   );
 }
 
+// --- Attachments: tile + modal --------------------------------------------
+function AttachmentTile({ file, onOpen, onRename, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(file.name);
+
+  useEffect(() => setName(file.name), [file.name]);
+
+  const isImg = file.type.startsWith("image/");
+  const ext = getExt(file.name);
+
+  return (
+    <div className="border rounded-lg p-2 shadow-sm hover:shadow transition bg-white flex flex-col">
+      <button
+        className="relative w-full h-28 rounded-md overflow-hidden border mb-2 bg-gray-50"
+        onClick={() => onOpen(file)}
+        title="Otwórz podgląd"
+      >
+        {isImg ? (
+          <img src={file.url} alt={file.name} className="w-full h-full object-contain" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-gray-600">
+            {file.type || ext?.toUpperCase() || "PLIK"}
+          </div>
+        )}
+      </button>
+
+      {editing ? (
+        <div className="flex items-center gap-1">
+          <input
+            className="flex-1 border rounded px-2 py-1 text-xs"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onRename(file.id, name.trim() || file.name);
+                setEditing(false);
+              }
+            }}
+          />
+          <button
+            className="text-xs px-2 py-1 border rounded"
+            onClick={() => {
+              onRename(file.id, name.trim() || file.name);
+              setEditing(false);
+            }}
+          >
+            Zapisz
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <div className="text-xs font-medium truncate flex-1" title={file.name}>
+            {file.name}
+          </div>
+          <button
+            className="text-xs px-2 py-1 border rounded"
+            onClick={() => setEditing(true)}
+            title="Zmień nazwę"
+          >
+            ✏️
+          </button>
+        </div>
+      )}
+
+      <div className="mt-2">
+        <button
+          className="text-xs text-red-600 underline"
+          onClick={() => onDelete(file.id)}
+          title="Usuń"
+        >
+          Usuń
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FloatingViewer({ file, onClose }) {
+  const overlayRef = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (!file) return null;
+
+  const isImg = file.type.startsWith("image/");
+  const isPdf = file.type === "application/pdf";
+  const isVideo = file.type.startsWith("video/");
+  const isAudio = file.type.startsWith("audio/");
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50"
+      style={{ background: "rgba(0,0,0,0.5)" }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
+    >
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-3 max-w-[90vw] max-h-[85vh] w-fit">
+        <div className="flex items-center justify-between mb-2 gap-4">
+          <div className="text-sm font-semibold truncate max-w-[70vw]" title={file.name}>
+            {file.name}
+          </div>
+          <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>
+            Zamknij
+          </button>
+        </div>
+        <div className="bg-gray-50 rounded-lg border overflow-hidden flex items-center justify-center">
+          {isImg && <img src={file.url} alt={file.name} className="max-w-[88vw] max-h-[75vh] object-contain" />}
+          {isPdf && <embed src={file.url} type="application/pdf" className="w-[88vw] h-[75vh]" />}
+          {isVideo && <video controls src={file.url} className="max-w-[88vw] max-h-[75vh]" />}
+          {isAudio && <audio controls src={file.url} className="w-[80vw]" />}
+          {!isImg && !isPdf && !isVideo && !isAudio && (
+            <div className="p-6 text-sm">
+              Nie można wyświetlić tego typu pliku.{" "}
+              <a href={file.url} download={file.name} className="underline text-blue-600">
+                Pobierz
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Main App --------------------------------------------------------------
 export default function App() {
   // form state
@@ -352,7 +486,17 @@ export default function App() {
     }
   });
 
-  // zapamiętuj nazwę gracza
+  // Załączniki: trzymamy w localStorage (tylko lokalnie u użytkownika)
+  const [files, setFiles] = useState(() => {
+    try {
+      const raw = localStorage.getItem("attachments");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [viewerFile, setViewerFile] = useState(null);
+
   useEffect(() => {
     try {
       localStorage.setItem("player-name", playerName || "");
@@ -376,6 +520,13 @@ export default function App() {
       dialogRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [log, autoScroll]);
+
+  // zapisuj listę plików w localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("attachments", JSON.stringify(files));
+    } catch {}
+  }, [files]);
 
   const socketRef = useRef(null);
   const bcRef = useRef(null);
@@ -484,13 +635,47 @@ export default function App() {
   };
 
   const onResetLocal = () => {
-    if (!confirm("Zresetować lokalną historię rzutów?")) return;
+    if (!confirm("Zresetować lokalną historię rzutów i załączniki?")) return;
+
+    // reset historii rzutów
     seenRef.current = new Set();
     setLog([]);
     try {
       localStorage.removeItem("dice-log");
     } catch {}
+
+    // reset załączników (localStorage + ewentualne stare z sessionStorage)
+    setFiles([]);
+    try {
+      localStorage.removeItem("attachments");
+      sessionStorage.removeItem("attachments");
+    } catch {}
   };
+
+  // --- Attachments handlers ------------------------------------------------
+  const onFilesSelected = async (e) => {
+    const list = e.target.files;
+    if (!list || !list.length) return;
+    const added = [];
+    for (const file of list) {
+      const id = uid();
+      const url = await readAsDataURL(file);
+      added.push({ id, name: file.name, type: file.type || "application/octet-stream", url });
+    }
+    setFiles((prev) => [...added, ...prev]);
+    e.target.value = "";
+  };
+
+  const readAsDataURL = (file) =>
+    new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = rej;
+      fr.readAsDataURL(file);
+    });
+
+  const renameFile = (id, name) => setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)));
+  const deleteFile = (id) => setFiles((prev) => prev.filter((f) => f.id !== id));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 overflow-x-hidden">
@@ -523,7 +708,7 @@ export default function App() {
           >
             Nowa sesja
           </button>
-          <button className="text-xs underline" onClick={onResetLocal} title="Wyczyść lokalną historię">
+          <button className="text-xs underline" onClick={onResetLocal} title="Wyczyść lokalną historię i załączniki">
             Reset
           </button>
         </div>
@@ -660,6 +845,34 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* --- ZAŁĄCZNIKI ------------------------------------------------ */}
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-semibold">Załączniki</div>
+                <label className="text-xs px-3 py-1 border rounded cursor-pointer bg-white hover:bg-gray-50">
+                  Dodaj pliki
+                  <input type="file" multiple className="hidden" onChange={onFilesSelected} />
+                </label>
+              </div>
+
+              {files.length === 0 ? (
+                <div className="text-xs text-gray-500">Brak plików. Dodaj pierwszy załącznik.</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {files.map((f) => (
+                    <AttachmentTile
+                      key={f.id}
+                      file={f}
+                      onOpen={setViewerFile}
+                      onRename={renameFile}
+                      onDelete={deleteFile}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* ---------------------------------------------------------------- */}
           </div>
         </div>
 
@@ -670,6 +883,9 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Floating viewer (modal) */}
+      <FloatingViewer file={viewerFile} onClose={() => setViewerFile(null)} />
     </div>
   );
 }
