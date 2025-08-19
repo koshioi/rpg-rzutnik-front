@@ -172,10 +172,10 @@ function LogCard({ item }) {
   const type = isHidden ? "UKRYTY" : item.resultType;
 
   const colorMap = {
-    SUKCES: { text: "text-green-800 font-bold", bg: "bg-green-100", ring: "ring-green-600", border: "border-green-500" },
-    PORAŻKA: { text: "text-amber-900 font-bold", bg: "bg-amber-100", ring: "ring-amber-600", border: "border-amber-500" },
-    PECH: { text: "text-red-700 font-bold", bg: "bg-red-100", ring: "ring-red-600", border: "border-red-500" },
-    UKRYTY: { text: "text-gray-900 font-bold", bg: "bg-gray-100", ring: "ring-gray-600", border: "border-gray-300" },
+    SUKCES: { text: "text-green-700 font-bold", bg: "bg-green-100", ring: "ring-green-600", border: "border-green-600" },
+    PORAŻKA: { text: "text-amber-800 font-bold", bg: "bg-amber-100", ring: "ring-amber-700", border: "border-amber-700" },
+    PECH:   { text: "text-red-700 font-bold",   bg: "bg-red-100",   ring: "ring-red-600",   border: "border-red-600" },
+    UKRYTY: { text: "text-gray-900 font-bold",  bg: "bg-gray-100",  ring: "ring-gray-600",  border: "border-gray-400" },
   };
   const c = colorMap[type];
 
@@ -375,11 +375,9 @@ export default function App() {
             <button onClick={onRoll} disabled={!playerName.trim()} className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Wykonaj rzut">RZUT!</button>
 
             {/* Okno dialogowe: ostatni wynik + historia (resizable) */}
-            <div ref={dialogRef} className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl overflow-y-auto resize-y h-[50vh] min-h-[220px] max-h-[80dvh]">
+            <div ref={dialogRef} className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl overflow-auto resize-y h-[50vh] min-h-[220px] max-h-[80dvh]">
               {/* Nagłówek */}
-              <div className="sticky top-0 z-10 bg-white border-b p-2 flex items-center justify-between">
-                <div className="text-sm font-semibold">OKNO DIALOGOWE</div>
-                <div className="text-[11px] text-gray-500">ostatni wynik + historia</div>
+              <div className="text-[11px] text-gray-500">ostatni wynik + historia</div>
               </div>
               {/* Ostatni rzut */}
               <div className="p-2">
