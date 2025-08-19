@@ -374,31 +374,54 @@ export default function App() {
 
             <button onClick={onRoll} disabled={!playerName.trim()} className="w-full py-3 text-lg rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Wykonaj rzut">RZUT!</button>
 
-            {/* Okno dialogowe: ostatni wynik + historia (resizable) */}
-            <div ref={dialogRef} className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl overflow-auto resize-y h-[50vh] min-h-[220px] max-h-[80dvh]">
-              {/* Nagłówek */}
-              <div className="text-[11px] text-gray-500">ostatni wynik + historia</div>
-              </div>
+            {/* Okno dialogowe: wynik + historia (scroll wewnętrzny) */}
+            <div
+              ref={dialogRef}
+              className="mt-3 rounded-2xl border-2 border-gray-800 bg-white shadow-xl
+                         overflow-auto resize-y h-[50vh] min-h-[220px] max-h-[80dvh]"
+            >
               {/* Ostatni rzut */}
               <div className="p-2">
-                {log[0] ? <LogCard item={log[0]} /> : <div className="text-xs text-gray-500">Brak wyniku.</div>}
+                {log[0] ? (
+                  <LogCard item={log[0]} />
+                ) : (
+                  <div className="text-xs text-gray-500">Brak wyniku.</div>
+                )}
               </div>
-              {/* Historia w tym samym oknie */}
+
+              {/* Historia w tej samej ramce */}
               <div className="border-t p-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs text-gray-500">Historia sesji (wspólna)</div>
                   <div className="flex items-center gap-3">
-                    <button className="text-xs underline" onClick={() => { navigator.clipboard?.writeText(window.location.href); }} title="Kopiuj link do tej sesji">Kopiuj link</button>
-                    <label className="text-xs inline-flex items-center gap-1"><input type="checkbox" checked={autoScroll} onChange={(e)=>setAutoScroll(e.target.checked)} /> Auto-scroll</label>
-                    <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
-                    <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
+                    <button
+                      className="text-xs underline"
+                      onClick={() => { navigator.clipboard?.writeText(window.location.href); }}
+                      title="Kopiuj link do tej sesji"
+                    >
+                      Kopiuj link
+                    </button>
+                    <label className="text-xs inline-flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={autoScroll}
+                        onChange={(e) => setAutoScroll(e.target.checked)}
+                      /> Auto-scroll
+                    </label>
+                    <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">
+                      Nowa sesja
+                    </button>
+                    <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">
+                      Wyczyść lokalnie
+                    </button>
                   </div>
                 </div>
+
                 <div className="space-y-2 pr-1">
                   {log.length === 0 ? (
                     <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
                   ) : (
-                    log.map((item, i) => (<LogCard key={i + item.timestamp} item={item} />))
+                    log.map((item, i) => <LogCard key={i + item.timestamp} item={item} />)
                   )}
                 </div>
               </div>
