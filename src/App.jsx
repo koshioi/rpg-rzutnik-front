@@ -340,6 +340,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 overflow-x-hidden">
+      {/* Pasek historii przeniesiony na górę strony */}
+      <div className="w-full bg-white/90 border-b sticky top-0 z-20" style={{position:'sticky', top:0, zIndex:20, background:'#ffffffcc', backdropFilter:'saturate(180%) blur(4px)', borderBottom:'1px solid rgba(0,0,0,0.1)'}}>
+        <div className="max-w-screen-2xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="text-xs text-gray-600">Historia sesji (wspólna)</div>
+          <div className="flex items-center gap-3">
+            <button className="text-xs underline" onClick={() => { navigator.clipboard?.writeText(window.location.href); }} title="Kopiuj link do tej sesji">Kopiuj link</button>
+            <label className="text-xs inline-flex items-center gap-1"><input type="checkbox" checked={autoScroll} onChange={(e)=>setAutoScroll(e.target.checked)} /> Auto-scroll</label>
+            <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">Nowa sesja</button>
+            <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">Wyczyść lokalnie</button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-5 gap-0 min-h-[70vh]">
         {/* Left: controls 1/5 */}
         <div className="col-span-1 border-r bg-white/80 backdrop-blur flex flex-col min-w-[300px]">
@@ -410,37 +423,12 @@ export default function App() {
 
               {/* Historia w tej samej ramce */}
               <div className="border-t p-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-gray-500">Historia sesji (wspólna)</div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      className="text-xs underline"
-                      onClick={() => { navigator.clipboard?.writeText(window.location.href); }}
-                      title="Kopiuj link do tej sesji"
-                    >
-                      Kopiuj link
-                    </button>
-                    <label className="text-xs inline-flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={autoScroll}
-                        onChange={(e) => setAutoScroll(e.target.checked)}
-                      /> Auto-scroll
-                    </label>
-                    <button className="text-xs underline" onClick={onNewSession} title="Czyści historię dla wszystkich">
-                      Nowa sesja
-                    </button>
-                    <button className="text-xs underline" onClick={clearLog} title="Czyści tylko u Ciebie">
-                      Wyczyść lokalnie
-                    </button>
-                  </div>
-                </div>
-
+                <div className="text-xs text-gray-500 mb-2">Historia sesji (wspólna)</div>
                 <div className="space-y-2 pr-1">
-                  {log.length === 0 ? (
-                    <div className="text-xs text-gray-500">Brak rzutów. Wykonaj pierwszy rzut!</div>
+                  {log.length <= 1 ? (
+                    <div className="text-xs text-gray-500">Brak starszych rzutów.</div>
                   ) : (
-                    log.map((item, i) => <LogCard key={i + item.timestamp} item={item} />)
+                    log.slice(1).map((item, i) => <LogCard key={(i+1) + item.timestamp} item={item} />)
                   )}
                 </div>
               </div>
